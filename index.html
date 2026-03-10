@@ -374,6 +374,17 @@
     </div>
   </div>
 
+  <div id="confirmModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-[60] hidden">
+    <div class="glass-strong w-full max-w-sm rounded-2xl p-5 border border-white/10">
+      <h4 id="confirmTitle" class="font-semibold text-lg card-title mb-1">Confirmar accion</h4>
+      <p id="confirmMessage" class="card-sub text-sm mb-4">Esta accion no se puede deshacer.</p>
+      <div class="flex justify-end gap-2">
+        <button id="confirmCancel" type="button" class="pill px-3 py-2 text-sm">Cancelar</button>
+        <button id="confirmOk" type="button" class="px-3 py-2 text-sm rounded-md bg-red-700/90 text-white">Eliminar</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     const timeline = document.getElementById('timeline');
     const timelineWrapper = document.getElementById('timelineWrapper');
@@ -395,6 +406,11 @@
     const nextTaskTitle = document.getElementById('nextTaskTitle');
     const nextTaskMeta = document.getElementById('nextTaskMeta');
     const nextTaskCountdown = document.getElementById('nextTaskCountdown');
+    const confirmModal = document.getElementById('confirmModal');
+    const confirmTitle = document.getElementById('confirmTitle');
+    const confirmMessage = document.getElementById('confirmMessage');
+    const confirmCancel = document.getElementById('confirmCancel');
+    const confirmOk = document.getElementById('confirmOk');
 
     let tasks = loadTasks();
     let completions = loadCompletions();
@@ -405,6 +421,7 @@
     let virtualModel = null;
     let virtualRaf = null;
     let virtualListenersBound = false;
+    let confirmResolver = null;
 
     function formatDateLabel(date = new Date()) {
       return date.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
@@ -580,6 +597,33 @@
       }
     }
 
+    function closeConfirmModal(result) {
+      if (confirmResolver) {
+        confirmResolver(result);
+        confirmResolver = null;
+      }
+      confirmModal.classList.add('hidden');
+    }
+
+    function askConfirm(options = {}) {
+      const {
+        title = 'Confirmar accion',
+        message = 'Esta accion no se puede deshacer.',
+        okText = 'Aceptar',
+        cancelText = 'Cancelar'
+      } = options;
+
+      confirmTitle.textContent = title;
+      confirmMessage.textContent = message;
+      confirmOk.textContent = okText;
+      confirmCancel.textContent = cancelText;
+      confirmModal.classList.remove('hidden');
+
+      return new Promise(resolve => {
+        confirmResolver = resolve;
+      });
+    }
+
     function buildTimelineRow(entry, done, index) {
       const row = document.createElement('div');
       row.className = 'absolute left-0 right-0 swipe-wrap';
@@ -732,6 +776,16 @@
     closeFormBtn.addEventListener('click', () => modal.classList.add('hidden'));
     modal.addEventListener('click', (e) => {
       if (e.target === modal) modal.classList.add('hidden');
+    });
+    confirmModal.addEventListener('click', (e) => {
+      if (e.target === confirmModal) closeConfirmModal(false);
+    });
+    confirmCancel.addEventListener('click', () => closeConfirmModal(false));
+    confirmOk.addEventListener('click', () => closeConfirmModal(true));
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && !confirmModal.classList.contains('hidden')) {
+        closeConfirmModal(false);
+      }
     });
 
     typeSelect.addEventListener('change', () => updateBlocks(typeSelect.value));
@@ -907,8 +961,14 @@
       modal.classList.remove('hidden');
     }
 
-    function deleteTask(id) {
-      if (!confirm('¿Eliminar esta tarea?')) return;
+    async function deleteTask(id) {
+      const ok = await askConfirm({
+        title: 'Eliminar tarea',
+        message: 'Se eliminara la tarea y sus ocurrencias de hoy.',
+        okText: 'Eliminar',
+        cancelText: 'Cancelar'
+      });
+      if (!ok) return;
       tasks = tasks.filter(t => t.id !== id);
       saveTasks();
       renderTimeline();
