@@ -4,6 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="theme-color" content="#0a0f1d" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <title>Ritmo - Grupos</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
@@ -11,26 +13,58 @@
       --bg: #0a0f1d;
       --bg-2: #0e1426;
       --card: rgba(18,24,39,0.96);
+      --card-strong: rgba(24,32,50,0.98);
       --text: #e5e7eb;
       --muted: #94a3b8;
       --stroke: rgba(255,255,255,0.16);
+      --accent: #8ff4d8;
+      --highlight: #b1c7ff;
     }
-    html, body {
+    html,
+    body {
       min-height: 100%;
-      background: linear-gradient(180deg, var(--bg-2), var(--bg));
+      width: 100%;
       color: var(--text);
-      overflow-x: hidden;
+      overflow-x: clip;
+      overscroll-behavior-x: none;
+      overscroll-behavior-y: none;
+      background-color: var(--bg);
       -webkit-text-size-adjust: 100%;
     }
+    html {
+      background: linear-gradient(180deg, var(--bg-2), var(--bg));
+    }
     body {
+      margin: 0;
+      position: relative;
+      isolation: isolate;
       min-height: 100dvh;
       padding-top: env(safe-area-inset-top);
       padding-bottom: env(safe-area-inset-bottom);
       font-family: "Space Grotesk", "Inter", system-ui, sans-serif;
     }
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      z-index: -2;
+      pointer-events: none;
+      background: radial-gradient(circle at 20% 20%, rgba(124, 248, 211, 0.08), transparent 32%),
+                  radial-gradient(circle at 80% 10%, rgba(168, 197, 255, 0.1), transparent 30%),
+                  radial-gradient(circle at 50% 90%, rgba(255, 255, 255, 0.04), transparent 30%),
+                  linear-gradient(180deg, var(--bg-2), var(--bg));
+    }
+    * { --tw-shadow-color: initial; }
+    .font-display { font-family: "Space Grotesk", "Inter", system-ui, sans-serif; }
     .glass-card {
       background: var(--card);
       border: 1px solid var(--stroke);
+      box-shadow: none;
+    }
+    .glass-strong {
+      background: var(--card-strong);
+      border: 1px solid rgba(255,255,255,0.12);
+      box-shadow: none;
     }
     .pill {
       background: rgba(255,255,255,0.08);
@@ -39,14 +73,26 @@
     input, button {
       font-size: 16px;
     }
+    .floating-bg {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background: radial-gradient(circle at 15% 50%, rgba(124, 248, 211, 0.08), transparent 22%),
+                  radial-gradient(circle at 85% 30%, rgba(255, 168, 205, 0.07), transparent 24%),
+                  radial-gradient(circle at 50% 50%, rgba(255,255,255,0.04), transparent 30%);
+      filter: blur(80px);
+      opacity: 0.75;
+      z-index: -1;
+    }
   </style>
 </head>
-<body>
-  <main class="max-w-3xl mx-auto px-4 py-6 sm:py-8">
+<body class="text-slate-100 antialiased">
+  <div class="floating-bg"></div>
+  <main class="relative max-w-5xl mx-auto px-4 pb-10 pt-10 sm:pt-14" style="padding-left:max(1rem,env(safe-area-inset-left));padding-right:max(1rem,env(safe-area-inset-right));">
     <header class="flex items-center justify-between mb-4">
       <div>
-        <p class="uppercase tracking-[0.28em] text-xs text-slate-400">Ritmo</p>
-        <h1 class="text-2xl sm:text-3xl font-semibold">Gestion de grupos</h1>
+        <p class="uppercase tracking-[0.3em] text-xs text-slate-400">Ritmo diario</p>
+        <h1 class="font-display text-2xl sm:text-3xl font-semibold">Gestion de grupos</h1>
       </div>
       <a href="index.html" class="pill px-3 py-2 text-sm">Volver</a>
     </header>
