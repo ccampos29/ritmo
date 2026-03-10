@@ -216,12 +216,24 @@
     }
     #fabAdd {
       bottom: calc(20px + env(safe-area-inset-bottom));
+      z-index: 70;
+      pointer-events: auto;
+      touch-action: manipulation;
     }
     /* Prevent iOS Safari focus zoom on form controls */
     input,
     select,
     textarea {
       font-size: 16px !important;
+    }
+    #taskForm input[type="time"] {
+      inline-size: 100%;
+      min-inline-size: 0;
+      max-inline-size: 100%;
+      box-sizing: border-box;
+    }
+    #taskForm .grid > label {
+      min-width: 0;
     }
   </style>
 </head>
@@ -309,7 +321,7 @@
             <input name="emoji" class="mt-1 w-full glass-card rounded-xl px-3 py-2 text-sm" placeholder="💧" maxlength="2" />
           </label>
         </div>
-        <div class="grid grid-cols-2 gap-3">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <label class="text-sm text-slate-200">Color
             <input name="color" type="color" value="#7cf8d3" class="mt-1 w-full h-10 glass-card rounded-xl px-2 py-1" />
           </label>
@@ -333,7 +345,7 @@
             </label>
           </div>
           <div data-type="every-x-hours" class="freq-block hidden">
-            <div class="grid grid-cols-2 gap-3">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <label class="text-sm text-slate-200 block">Desde
                 <input name="startTime" type="time" value="07:00" class="mt-1 w-full glass-card rounded-xl px-3 py-2 text-sm" />
               </label>
