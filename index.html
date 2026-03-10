@@ -252,6 +252,7 @@
           <p class="text-xs uppercase text-slate-400">Hoy</p>
           <p id="todayLabel" class="text-lg font-semibold text-white"></p>
         </div>
+        <a href="groups.html" class="pill px-3 py-2 text-xs text-slate-100">Grupos</a>
       </div>
     </header>
 
@@ -321,13 +322,13 @@
             <input name="emoji" class="mt-1 w-full glass-card rounded-xl px-3 py-2 text-sm" placeholder="💧" maxlength="2" />
           </label>
         </div>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <label class="text-sm text-slate-200">Color
-            <input name="color" type="color" value="#7cf8d3" class="mt-1 w-full h-10 glass-card rounded-xl px-2 py-1" />
-          </label>
-          <label class="text-sm text-slate-200">Grupo
-            <input name="group" class="mt-1 w-full glass-card rounded-xl px-3 py-2 text-sm" placeholder="Mañana" />
-          </label>
+        <div class="space-y-2">
+          <label class="text-sm text-slate-200 block">Grupo</label>
+          <div class="grid grid-cols-[1fr_auto] gap-2">
+            <select name="groupId" id="groupSelect" class="w-full glass-card rounded-xl px-3 py-2 text-sm"></select>
+            <a href="groups.html" class="pill px-3 py-2 text-sm text-slate-100">Gestionar</a>
+          </div>
+          <p id="groupColorHint" class="text-xs text-slate-400">Color del grupo se aplica automaticamente.</p>
         </div>
         <label class="text-sm text-slate-200 block">Tipo de frecuencia
           <select name="type" class="mt-1 w-full glass-card rounded-xl px-3 py-2 text-sm">
@@ -414,6 +415,8 @@
     const form = document.getElementById('taskForm');
     const dynamicBlocks = document.querySelectorAll('.freq-block');
     const typeSelect = form.elements['type'];
+    const groupSelect = form.elements['groupId'];
+    const groupColorHint = document.getElementById('groupColorHint');
     const timesList = document.getElementById('timesList');
     const addTimeBtn = document.getElementById('addTime');
     const newTimeInput = document.getElementById('newTime');
@@ -431,6 +434,7 @@
     const confirmCancel = document.getElementById('confirmCancel');
     const confirmOk = document.getElementById('confirmOk');
 
+    let groups = loadGroups();
     let tasks = loadTasks();
     let completions = loadCompletions();
     let multiTimesBuffer = ['08:00', '12:00', '18:00'];
@@ -473,6 +477,27 @@
       localStorage.setItem('ritmo_tasks', JSON.stringify(tasks));
     }
 
+    function defaultGroups() {
+      return [
+        { id: 'wellness', name: 'Bienestar', color: '#7cf8d3' },
+        { id: 'work', name: 'Trabajo', color: '#a8c5ff' },
+        { id: 'morning', name: 'Mananas', color: '#ffa8c5' }
+      ];
+    }
+
+    function loadGroups() {
+      try {
+        const raw = localStorage.getItem('ritmo_groups');
+        if (raw) return JSON.parse(raw);
+        const seeded = defaultGroups();
+        localStorage.setItem('ritmo_groups', JSON.stringify(seeded));
+        return seeded;
+      } catch (e) {
+        console.error(e);
+        return defaultGroups();
+      }
+    }
+
     function saveCompletions() {
       localStorage.setItem('ritmo_completions', JSON.stringify(completions));
     }
@@ -483,6 +508,7 @@
           id: crypto.randomUUID(),
           title: 'Beber agua',
           emoji: '💧',
+          groupId: 'wellness',
           color: '#7cf8d3',
           group: 'Bienestar',
           type: 'every-x-hours',
@@ -493,6 +519,7 @@
           id: crypto.randomUUID(),
           title: 'Revisión inbox',
           emoji: '📬',
+          groupId: 'work',
           color: '#a8c5ff',
           group: 'Trabajo',
           type: 'multi-times',
@@ -502,6 +529,7 @@
           id: crypto.randomUUID(),
           title: 'Correr 20min',
           emoji: '🏃',
+          groupId: 'morning',
           color: '#ffa8c5',
           group: 'Mañanas',
           type: 'weekdays',
@@ -542,6 +570,55 @@
         default:
           return [];
       }
+    }
+
+    function resolveGroupByTask(task) {
+      if (task.groupId) {
+        const byId = groups.find(g => g.id === task.groupId);
+        if (byId) return byId;
+      }
+      if (task.group) {
+        const byName = groups.find(g => g.name.toLowerCase() === task.group.toLowerCase());
+        if (byName) return byName;
+      }
+      return null;
+    }
+
+    function resolveTaskGroup(task) {
+      const group = resolveGroupByTask(task);
+      return group ? group.name : (task.group || 'General');
+    }
+
+    function resolveTaskColor(task) {
+      const group = resolveGroupByTask(task);
+      return group ? group.color : (task.color || '#7cf8d3');
+    }
+
+    function renderGroupOptions(selectedId = '') {
+      const nextSelected = selectedId || groupSelect.value;
+      groupSelect.innerHTML = '';
+      groups.forEach(group => {
+        const option = document.createElement('option');
+        option.value = group.id;
+        option.textContent = group.name;
+        groupSelect.appendChild(option);
+      });
+      if (groups.length > 0) {
+        const hasSelected = groups.some(group => group.id === nextSelected);
+        groupSelect.value = hasSelected ? nextSelected : groups[0].id;
+      }
+      updateGroupHint();
+    }
+
+    function updateGroupHint() {
+      const selected = groups.find(group => group.id === groupSelect.value);
+      if (!selected) {
+        groupColorHint.textContent = 'Color del grupo se aplica automaticamente.';
+        groupColorHint.style.color = '';
+        return;
+      }
+      groupColorHint.textContent = `Color aplicado: ${selected.color}`;
+      groupColorHint.style.color = selected.color;
     }
 
     function collectTodayOccurrences() {
@@ -603,7 +680,7 @@
       const targetDate = timeToDate(target.time, now);
       const diff = targetDate.getTime() - now.getTime();
       const emoji = target.task.emoji?.trim() || '•';
-      const group = target.task.group?.trim() || 'General';
+      const group = resolveTaskGroup(target.task);
 
       nextTaskEmoji.textContent = emoji;
       nextTaskTitle.textContent = target.task.title;
@@ -664,15 +741,17 @@
       row.appendChild(actions);
 
       const card = document.createElement('article');
+      const taskColor = resolveTaskColor(entry.task);
+      const taskGroup = resolveTaskGroup(entry.task);
       card.className = `glass-strong card-bg rounded-none px-4 py-3 border border-white/10 flex items-center gap-3 hover:border-white/30 transition card-inner h-full ${done ? 'done-card collapsed-card' : ''}`;
-      card.style.borderLeft = `6px solid ${entry.task.color || '#7cf8d3'}`;
+      card.style.borderLeft = `6px solid ${taskColor}`;
       card.innerHTML = `
         <button class="check-btn ${done ? 'checked' : ''}" data-action="done" data-id="${entry.task.id}" data-time="${entry.time}">${done ? '✔' : ''}</button>
-        <div class="avatar w-10 h-10 rounded-xl flex items-center justify-center text-xl" style="background:${entry.task.color || '#7cf8d3'}22; color:${entry.task.color || '#7cf8d3'}">${entry.task.emoji || '•'}</div>
+        <div class="avatar w-10 h-10 rounded-xl flex items-center justify-center text-xl" style="background:${taskColor}22; color:${taskColor}">${entry.task.emoji || '•'}</div>
         <div class="flex-1 card-main">
           <p class="text-xs uppercase tracking-[0.2em] time-label">${entry.time}</p>
           <p class="font-semibold text-base card-title">${entry.task.title}</p>
-          <p class="card-sub text-xs">${entry.task.group || 'General'}</p>
+          <p class="card-sub text-xs">${taskGroup}</p>
         </div>
       `;
       row.appendChild(card);
@@ -783,6 +862,8 @@
     function openTaskModal() {
       editingTaskId = null;
       form.reset();
+      groups = loadGroups();
+      renderGroupOptions('');
       multiTimesBuffer = ['08:00', '12:00', '18:00'];
       renderTimesChips();
       updateBlocks('daily');
@@ -808,6 +889,7 @@
     });
 
     typeSelect.addEventListener('change', () => updateBlocks(typeSelect.value));
+    groupSelect.addEventListener('change', updateGroupHint);
 
     function updateBlocks(type) {
       dynamicBlocks.forEach(block => {
@@ -848,12 +930,14 @@
       e.preventDefault();
       const data = Object.fromEntries(new FormData(form));
       const type = data.type;
+      const selectedGroup = groups.find(group => group.id === data.groupId);
       const base = {
         id: editingTaskId || crypto.randomUUID(),
         title: data.title,
         emoji: data.emoji,
-        color: data.color,
-        group: data.group,
+        groupId: selectedGroup ? selectedGroup.id : '',
+        color: selectedGroup ? selectedGroup.color : '#7cf8d3',
+        group: selectedGroup ? selectedGroup.name : '',
         type
       };
 
@@ -953,10 +1037,11 @@
       const task = tasks.find(t => t.id === id);
       if (!task) return;
       editingTaskId = id;
+      groups = loadGroups();
+      const matchedGroup = resolveGroupByTask(task);
+      renderGroupOptions(matchedGroup ? matchedGroup.id : '');
       form.elements['title'].value = task.title || '';
       form.elements['emoji'].value = task.emoji || '';
-      form.elements['color'].value = task.color || '#7cf8d3';
-      form.elements['group'].value = task.group || '';
       form.elements['type'].value = task.type;
       updateBlocks(task.type);
 
@@ -1028,6 +1113,7 @@
 
     // init
     ensureDailyReset();
+    renderGroupOptions('');
 
     renderTimesChips();
     updateBlocks(typeSelect.value);
