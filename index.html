@@ -1,0 +1,907 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ritmo — Planificador en línea de tiempo</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            display: ['"Space Grotesk"', 'Inter', 'system-ui', 'sans-serif'],
+            body: ['"Inter"', 'system-ui', 'sans-serif']
+          },
+          colors: {
+            base: '#0c1021',
+            glass: 'rgba(255,255,255,0.06)',
+            accent: '#7cf8d3',
+            highlight: '#a8c5ff'
+          },
+          boxShadow: {
+            glow: '0 10px 40px rgba(124, 248, 211, 0.25)',
+            glass: '0 15px 80px rgba(0,0,0,0.35)'
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    :root {
+      --bg: #0a0f1d;
+      --bg-2: #0e1426;
+      --card: rgba(18,24,39,0.96);
+      --card-strong: rgba(24,32,50,0.98);
+      --card-glow: rgba(255,255,255,0.08);
+      --text: #e5e7eb;
+      --text-strong: #f8fafc;
+      --muted: #c5cfda;
+      --rail: rgba(148,163,184,0.45);
+      --accent: #8ff4d8;
+      --highlight: #b1c7ff;
+      --stroke: rgba(255,255,255,0.22);
+      --pill-bg: rgba(255,255,255,0.10);
+      --pill-border: rgba(255,255,255,0.12);
+    }
+    body.hc {
+      --card: rgba(22,28,45,0.98);
+      --card-strong: rgba(26,33,52,0.99);
+      --card-glow: rgba(255,255,255,0.14);
+      --text: #f9fafb;
+      --text-strong: #ffffff;
+      --muted: #e2e8f0;
+      --stroke: rgba(255,255,255,0.38);
+      --pill-bg: rgba(255,255,255,0.14);
+      --pill-border: rgba(255,255,255,0.2);
+    }
+    /* Light theme removido; solo dark */
+    body {
+      background: radial-gradient(circle at 20% 20%, rgba(124, 248, 211, 0.08), transparent 32%),
+                  radial-gradient(circle at 80% 10%, rgba(168, 197, 255, 0.1), transparent 30%),
+                  radial-gradient(circle at 50% 90%, rgba(255, 255, 255, 0.04), transparent 30%),
+                  linear-gradient(180deg, var(--bg-2), var(--bg));
+      color: var(--text);
+      min-height: 100vh;
+      transition: background 0.3s ease, color 0.3s ease;
+    }
+    *, ::before, ::after { --tw-shadow-color: initial; }
+    .glass-card {
+      background: var(--card);
+      border: 1px solid rgba(255,255,255,0.08);
+      box-shadow: none;
+    }
+    .glass-strong {
+      background: var(--card-strong);
+      border: 1px solid rgba(255,255,255,0.12);
+      box-shadow: none;
+    }
+    .timeline-dot {
+      box-shadow: 0 0 0 6px rgba(124,248,211,0.12);
+    }
+    .pill {
+      background: var(--pill-bg);
+      border: 1px solid var(--pill-border);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+    }
+    .done-card {
+      opacity: 0.5;
+      filter: grayscale(0.35);
+    }
+    .shadow-glass { box-shadow: none !important; }
+    .collapsed-card .card-main {
+      display: block;
+      flex: 0 1 auto;
+      min-width: 0;
+    }
+    .collapsed-card .time-label,
+    .collapsed-card .card-sub { display: none; }
+    .collapsed-card .card-title {
+      font-size: 1rem;
+      line-height: 1.2;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .collapsed-card { padding: 12px 14px; }
+    .collapsed-card .avatar { margin-right: 0; }
+    .card-title {
+      color: var(--text-strong) !important;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.25);
+    }
+    .card-sub { color: var(--muted); }
+    .time-label { color: var(--muted); font-weight: 600; letter-spacing: 0.08em; }
+    .card-bg { background: transparent; }
+    .check-btn {
+      width: 36px; height: 36px;
+      border-radius: 9999px;
+      border: 2px solid var(--stroke);
+      display: inline-flex; align-items: center; justify-content: center;
+      background: rgba(255,255,255,0.07);
+      color: var(--text);
+      transition: all 0.15s ease;
+    }
+    .theme-light .check-btn { background: rgba(15,23,42,0.04); color: #0f172a; }
+    .check-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .check-btn.checked {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #0b0f1d;
+    }
+    .emoji-option {
+      width: 34px;
+      height: 34px;
+      border-radius: 10px;
+      border: 1px solid var(--stroke);
+      background: rgba(255,255,255,0.05);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      transition: transform 0.12s ease, border-color 0.12s ease, background 0.12s ease;
+    }
+    .emoji-option:hover {
+      transform: translateY(-1px);
+      border-color: var(--accent);
+    }
+    .emoji-option.active {
+      background: rgba(143, 244, 216, 0.16);
+      border-color: var(--accent);
+    }
+    .floating-bg {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background: radial-gradient(circle at 15% 50%, rgba(124, 248, 211, 0.08), transparent 22%),
+                  radial-gradient(circle at 85% 30%, rgba(255, 168, 205, 0.07), transparent 24%),
+                  radial-gradient(circle at 50% 50%, rgba(255,255,255,0.04), transparent 30%);
+      filter: blur(80px);
+      opacity: 0.75;
+    }
+    .swipe-wrap {
+      --swipe-width: 176px;
+      position: relative;
+      overflow: hidden;
+    }
+    .swipe-actions {
+      position: absolute;
+      top: 0;
+      right: 8px;
+      bottom: 0;
+      width: var(--swipe-width);
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      border-radius: 0;
+      overflow: hidden;
+      pointer-events: none;
+      opacity: 0;
+      visibility: hidden;
+      transform: translateX(16px);
+      transition: opacity 0.18s ease, transform 0.18s ease, visibility 0.18s ease;
+      z-index: 0;
+    }
+    .swiped .swipe-actions {
+      opacity: 1;
+      visibility: visible;
+      transform: translateX(0);
+    }
+    .swipe-actions button {
+      pointer-events: auto;
+      border: 0;
+      color: #f8fafc;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      transition: filter 0.18s ease;
+    }
+    .swipe-actions button:hover {
+      filter: brightness(1.08);
+    }
+    .swipe-edit {
+      background: rgba(71, 85, 105, 0.9);
+    }
+    .swipe-delete {
+      background: rgba(185, 28, 28, 0.9);
+    }
+    .swipe-label {
+      display: inline-flex;
+      width: 100%;
+      height: 100%;
+      align-items: center;
+      justify-content: center;
+    }
+    .swiped .card-inner {
+      transform: translateX(calc(-1 * var(--swipe-width)));
+    }
+    .card-inner {
+      transition: transform 0.2s ease;
+      will-change: transform;
+      position: relative;
+      z-index: 1;
+    }
+  </style>
+</head>
+<body class="text-slate-100 font-body antialiased">
+  <div class="floating-bg"></div>
+  <div class="relative max-w-5xl mx-auto px-4 pb-28 pt-10 sm:pt-14">
+    <header class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
+      <div>
+        <p class="uppercase text-xs tracking-[0.3em] text-slate-400">Ritmo diario</p>
+        <h1 class="font-display text-3xl sm:text-4xl font-semibold flex items-center gap-2">
+          Tu línea del día
+        </h1>
+      </div>
+      <div class="glass-card rounded-2xl px-4 py-3 flex items-center gap-3 shadow-glass">
+        <div>
+          <p class="text-xs uppercase text-slate-400">Hoy</p>
+          <p id="todayLabel" class="text-lg font-semibold text-white"></p>
+        </div>
+      </div>
+    </header>
+
+    <section class="glass-card rounded-3xl p-5 sm:p-6 shadow-glass relative overflow-hidden">
+      <div class="absolute inset-0 pointer-events-none opacity-40" aria-hidden="true">
+        <div class="absolute -left-32 top-10 w-72 h-72 bg-gradient-to-br from-accent/10 to-white/5 rounded-full blur-3xl"></div>
+        <div class="absolute right-0 -bottom-24 w-80 h-80 bg-gradient-to-tr from-highlight/10 to-white/5 rounded-full blur-3xl"></div>
+      </div>
+      <div class="relative flex items-center justify-between mb-4">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-2xl bg-accent/10 text-accent flex items-center justify-center text-xl">⏱️</div>
+          <div>
+            <h2 class="font-display text-xl font-semibold">Línea del tiempo</h2>
+          </div>
+        </div>
+        <div></div>
+      </div>
+
+      <div class="relative mb-4">
+        <div class="flex items-center justify-between text-sm text-slate-300 mb-2">
+          <span id="progressLabel">Progreso 0%</span>
+          <span id="progressCount" class="text-slate-400">0 / 0</span>
+        </div>
+        <div class="h-3 rounded-full bg-white/5 overflow-hidden">
+          <div id="progressBar" class="h-full w-0 bg-gradient-to-r from-accent to-highlight transition-all duration-300"></div>
+        </div>
+      </div>
+
+      <div class="flex flex-wrap gap-2 mb-4 text-xs" id="filtersBar">
+        <span class="pill px-3 py-1 text-slate-300">Filtrar:</span>
+        <div class="flex gap-2 flex-wrap" id="timeFilters"></div>
+        <div class="flex gap-2 flex-wrap" id="groupFilters"></div>
+      </div>
+
+      <div class="relative overflow-x-auto" id="timelineWrapper">
+        <div id="timeline" class="relative flex flex-col gap-4 min-w-full pt-2 pb-2"></div>
+      </div>
+    </section>
+
+  </div>
+
+  <button id="fabAdd" class="fixed right-5 bottom-5 sm:right-8 sm:bottom-8 w-14 h-14 rounded-full bg-accent text-slate-900 text-3xl shadow-glow flex items-center justify-center hover:brightness-110">＋</button>
+
+  <!-- Modal -->
+  <div id="taskModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 hidden">
+    <div class="glass-strong w-full max-w-lg rounded-3xl p-6 relative shadow-glass">
+      <button id="closeForm" class="absolute top-3 right-3 text-slate-400 hover:text-white">✕</button>
+      <h3 class="font-display text-xl font-semibold mb-1">Nueva tarea</h3>
+      <p class="text-slate-400 text-sm mb-4">Define frecuencia, horario(s) y estilo. Todo queda guardado en tu navegador.</p>
+      <form id="taskForm" class="space-y-3">
+        <div class="grid grid-cols-4 gap-3">
+          <label class="col-span-3 text-sm text-slate-200">Título
+            <input name="title" required class="mt-1 w-full glass-card rounded-xl px-3 py-2 text-sm outline-none" placeholder="Ej. Beber agua" />
+          </label>
+          <label class="text-sm text-slate-200">Emoji
+            <input name="emoji" class="mt-1 w-full glass-card rounded-xl px-3 py-2 text-sm" placeholder="💧" maxlength="2" />
+          </label>
+          <div id="emojiQuick" class="col-span-4 flex flex-wrap gap-2"></div>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <label class="text-sm text-slate-200">Color
+            <input name="color" type="color" value="#7cf8d3" class="mt-1 w-full h-10 glass-card rounded-xl px-2 py-1" />
+          </label>
+          <label class="text-sm text-slate-200">Grupo
+            <input name="group" class="mt-1 w-full glass-card rounded-xl px-3 py-2 text-sm" placeholder="Mañana" />
+          </label>
+        </div>
+        <label class="text-sm text-slate-200 block">Tipo de frecuencia
+          <select name="type" class="mt-1 w-full glass-card rounded-xl px-3 py-2 text-sm">
+            <option value="daily">Diaria</option>
+            <option value="every-x-hours">Cada X horas</option>
+            <option value="weekdays">Días específicos</option>
+            <option value="specific-dates">Fechas específicas</option>
+            <option value="multi-times">Varias veces al día</option>
+          </select>
+        </label>
+        <div id="dynamicFields" class="space-y-3">
+          <div data-type="daily" class="freq-block">
+            <label class="text-sm text-slate-200 block">Hora
+              <input name="time" type="time" value="08:00" class="mt-1 w-full glass-card rounded-xl px-3 py-2 text-sm" />
+            </label>
+          </div>
+          <div data-type="every-x-hours" class="freq-block hidden">
+            <div class="grid grid-cols-2 gap-3">
+              <label class="text-sm text-slate-200 block">Desde
+                <input name="startTime" type="time" value="07:00" class="mt-1 w-full glass-card rounded-xl px-3 py-2 text-sm" />
+              </label>
+              <label class="text-sm text-slate-200 block">Cada (horas)
+                <input name="interval" type="number" min="1" value="3" class="mt-1 w-full glass-card rounded-xl px-3 py-2 text-sm" />
+              </label>
+            </div>
+          </div>
+          <div data-type="weekdays" class="freq-block hidden">
+            <p class="text-sm text-slate-200 mb-1">Días</p>
+            <div class="grid grid-cols-3 gap-2 text-xs text-slate-200">
+              <label class="pill px-3 py-2 flex items-center gap-2"><input type="checkbox" name="days" value="1" checked /> Lun</label>
+              <label class="pill px-3 py-2 flex items-center gap-2"><input type="checkbox" name="days" value="2" /> Mar</label>
+              <label class="pill px-3 py-2 flex items-center gap-2"><input type="checkbox" name="days" value="3" /> Mié</label>
+              <label class="pill px-3 py-2 flex items-center gap-2"><input type="checkbox" name="days" value="4" /> Jue</label>
+              <label class="pill px-3 py-2 flex items-center gap-2"><input type="checkbox" name="days" value="5" /> Vie</label>
+              <label class="pill px-3 py-2 flex items-center gap-2"><input type="checkbox" name="days" value="6" /> Sáb</label>
+              <label class="pill px-3 py-2 flex items-center gap-2"><input type="checkbox" name="days" value="0" /> Dom</label>
+            </div>
+            <label class="text-sm text-slate-200 block mt-2">Hora
+              <input name="weekdayTime" type="time" value="09:00" class="mt-1 w-full glass-card rounded-xl px-3 py-2 text-sm" />
+            </label>
+          </div>
+          <div data-type="specific-dates" class="freq-block hidden">
+            <label class="text-sm text-slate-200 block">Fechas
+              <input name="dates" type="text" placeholder="2026-03-10,2026-03-15" class="mt-1 w-full glass-card rounded-xl px-3 py-2 text-sm" />
+            </label>
+            <label class="text-sm text-slate-200 block">Hora
+              <input name="specificTime" type="time" value="10:00" class="mt-1 w-full glass-card rounded-xl px-3 py-2 text-sm" />
+            </label>
+          </div>
+          <div data-type="multi-times" class="freq-block hidden">
+            <p class="text-sm text-slate-200">Horas del día</p>
+            <div class="flex gap-2 flex-wrap" id="timesList"></div>
+            <div class="flex gap-2">
+              <input id="newTime" type="time" value="08:00" class="glass-card rounded-xl px-3 py-2 text-sm flex-1" />
+              <button type="button" id="addTime" class="pill px-3 py-2 text-sm hover:bg-white/15">Agregar</button>
+            </div>
+          </div>
+        </div>
+        <div class="flex items-center justify-end pt-2">
+          <button class="bg-accent text-slate-900 font-semibold px-4 py-2 rounded-xl shadow-glow hover:brightness-110">Guardar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    const timeline = document.getElementById('timeline');
+    const timelineWrapper = document.getElementById('timelineWrapper');
+    const todayLabel = document.getElementById('todayLabel');
+    const modal = document.getElementById('taskModal');
+    const openFormBtn = document.getElementById('openForm');
+    const closeFormBtn = document.getElementById('closeForm');
+    const form = document.getElementById('taskForm');
+    const dynamicBlocks = document.querySelectorAll('.freq-block');
+    const typeSelect = form.elements['type'];
+    const emojiInput = form.elements['emoji'];
+    const emojiQuick = document.getElementById('emojiQuick');
+    const timesList = document.getElementById('timesList');
+    const addTimeBtn = document.getElementById('addTime');
+    const newTimeInput = document.getElementById('newTime');
+    const progressLabel = document.getElementById('progressLabel');
+    const progressCount = document.getElementById('progressCount');
+    const progressBar = document.getElementById('progressBar');
+    const timeFilters = document.getElementById('timeFilters');
+    const groupFilters = document.getElementById('groupFilters');
+    const fabAdd = document.getElementById('fabAdd');
+
+    let tasks = loadTasks();
+    let completions = loadCompletions();
+    let multiTimesBuffer = ['08:00', '12:00', '18:00'];
+    let editingTaskId = null;
+    let filterTime = 'all'; // all, morning, afternoon, night, dawn
+    let filterGroup = 'all';
+    const emojiOptions = ['💧', '🏃', '📬', '📚', '🧘', '💊', '🍎', '🚶', '🧹', '💼', '😴', '🧠'];
+
+    function formatDateLabel(date = new Date()) {
+      return date.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
+    }
+
+    function loadTasks() {
+      try {
+        const raw = localStorage.getItem('ritmo_tasks');
+        if (raw) return JSON.parse(raw);
+        const seeded = sampleTasks();
+        localStorage.setItem('ritmo_tasks', JSON.stringify(seeded));
+        return seeded;
+      } catch (e) {
+        console.error(e);
+        return sampleTasks();
+      }
+    }
+
+    function loadCompletions() {
+      try {
+        const raw = localStorage.getItem('ritmo_completions');
+        return raw ? JSON.parse(raw) : {};
+      } catch (e) {
+        console.error(e);
+        return {};
+      }
+    }
+
+    function saveTasks() {
+      localStorage.setItem('ritmo_tasks', JSON.stringify(tasks));
+    }
+
+    function saveCompletions() {
+      localStorage.setItem('ritmo_completions', JSON.stringify(completions));
+    }
+
+    function sampleTasks() {
+      return [
+        {
+          id: crypto.randomUUID(),
+          title: 'Beber agua',
+          emoji: '💧',
+          color: '#7cf8d3',
+          group: 'Bienestar',
+          type: 'every-x-hours',
+          startTime: '07:00',
+          interval: 3
+        },
+        {
+          id: crypto.randomUUID(),
+          title: 'Revisión inbox',
+          emoji: '📬',
+          color: '#a8c5ff',
+          group: 'Trabajo',
+          type: 'multi-times',
+          times: ['09:30', '13:00', '17:30']
+        },
+        {
+          id: crypto.randomUUID(),
+          title: 'Correr 20min',
+          emoji: '🏃',
+          color: '#ffa8c5',
+          group: 'Mañanas',
+          type: 'weekdays',
+          days: [1,2,3,4,5],
+          weekdayTime: '06:40'
+        }
+      ];
+    }
+
+    function getOccurrencesForToday(task, date = new Date()) {
+      const day = date.getDay();
+      const todayStr = date.toISOString().slice(0,10);
+      switch (task.type) {
+        case 'daily':
+          return [task.time || '09:00'];
+        case 'every-x-hours': {
+          const times = [];
+          if (!task.startTime || !task.interval) return times;
+          const [h, m] = task.startTime.split(':').map(Number);
+          let current = new Date(date);
+          current.setHours(h, m, 0, 0);
+          while (current.getDate() === date.getDate()) {
+            times.push(current.toTimeString().slice(0,5));
+            current = new Date(current.getTime() + task.interval * 60 * 60 * 1000);
+          }
+          return times;
+        }
+        case 'weekdays': {
+          if (!task.days || !task.days.includes(day)) return [];
+          return [task.weekdayTime || '09:00'];
+        }
+        case 'specific-dates': {
+          const list = (task.dates || []).map(d => d.slice(0,10));
+          return list.includes(todayStr) ? [task.specificTime || '10:00'] : [];
+        }
+        case 'multi-times':
+          return task.times || [];
+        default:
+          return [];
+      }
+    }
+
+    function inTimeFilter(time) {
+      if (filterTime === 'all') return true;
+      const [h, m] = time.split(':').map(Number);
+      const minutes = h * 60 + m;
+      if (filterTime === 'dawn') return minutes >= 0 && minutes < 300;       // 00:00-04:59
+      if (filterTime === 'morning') return minutes >= 300 && minutes < 720;   // 05:00-11:59
+      if (filterTime === 'afternoon') return minutes >= 720 && minutes < 1080; // 12:00-17:59
+      if (filterTime === 'night') return minutes >= 1080;      // 18:00-23:59
+      return true;
+    }
+
+    function inGroupFilter(group) {
+      if (filterGroup === 'all') return true;
+      return (group || '').toLowerCase() === filterGroup.toLowerCase();
+    }
+
+    function renderTimeline() {
+      ensureDailyReset();
+      todayLabel.textContent = formatDateLabel();
+      timeline.innerHTML = '';
+      const occurrences = [];
+      const todayKey = todayISO();
+
+      tasks.forEach(task => {
+        const times = getOccurrencesForToday(task).map(time => ({ time, task }));
+        occurrences.push(...times);
+      });
+
+      const sorted = occurrences.sort((a, b) => a.time.localeCompare(b.time));
+      const filtered = sorted.filter(entry => inTimeFilter(entry.time) && inGroupFilter(entry.task.group));
+      const total = filtered.length;
+      let completed = 0;
+
+      // timeline vertical rail
+      if (tasks.length === 0) {
+        const empty = document.createElement('div');
+        empty.className = 'glass-card rounded-2xl p-5 text-slate-200';
+        empty.innerHTML = `<p class="text-lg font-semibold mb-1">No hay tareas aún</p>
+        <p class="text-slate-400">Pulsa el botón + para crear tu primera rutina. Elige tipo de frecuencia y añade horarios.</p>`;
+        timeline.appendChild(empty);
+        updateProgress(0,0);
+        return;
+      }
+
+      filtered.forEach(entry => {
+        const done = (completions[todayKey] || {})[occurrenceKey(entry.task.id, entry.time)];
+        if (done) completed++;
+
+        const row = document.createElement('div');
+        row.className = 'relative swipe-wrap';
+        row.dataset.id = entry.task.id;
+        row.dataset.time = entry.time;
+
+        const actions = document.createElement('div');
+        actions.className = 'pl-2 swipe-actions';
+        actions.innerHTML = `
+          <button class="swipe-edit" data-action="edit" data-id="${entry.task.id}">
+            <span class="swipe-label">Editar</span>
+          </button>
+          <button class="swipe-delete" data-action="delete" data-id="${entry.task.id}">
+            <span class="swipe-label">Eliminar</span>
+          </button>
+        `;
+        row.appendChild(actions);
+
+        const card = document.createElement('article');
+        card.className = `glass-strong card-bg rounded-none px-4 py-3 border border-white/10 flex items-center gap-3 hover:border-white/30 transition card-inner ${done ? 'done-card collapsed-card' : ''}`;
+        card.style.borderLeft = `6px solid ${entry.task.color || '#7cf8d3'}`;
+        card.innerHTML = `
+          <button class="check-btn ${done ? 'checked' : ''}" data-action="done" data-id="${entry.task.id}" data-time="${entry.time}">${done ? '✔' : ''}</button>
+          <div class="avatar w-10 h-10 rounded-xl flex items-center justify-center text-xl" style="background:${entry.task.color || '#7cf8d3'}22; color:${entry.task.color || '#7cf8d3'}">${entry.task.emoji || '•'}</div>
+          <div class="flex-1 card-main">
+            <p class="text-xs uppercase tracking-[0.2em] time-label">${entry.time}</p>
+            <p class="font-semibold text-base card-title">${entry.task.title}</p>
+            <p class="card-sub text-xs">${entry.task.group || 'General'}</p>
+          </div>
+        `;
+        row.appendChild(card);
+        timeline.appendChild(row);
+      });
+
+      updateProgress(completed, total);
+    }
+
+    function renderEmojiQuick(selected = '') {
+      if (!emojiQuick) return;
+      const selectedEmoji = (selected || '').trim();
+      emojiQuick.innerHTML = '';
+      emojiOptions.forEach(emoji => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = `emoji-option ${selectedEmoji === emoji ? 'active' : ''}`;
+        btn.dataset.emoji = emoji;
+        btn.textContent = emoji;
+        emojiQuick.appendChild(btn);
+      });
+    }
+
+    function openTaskModal() {
+      editingTaskId = null;
+      form.reset();
+      multiTimesBuffer = ['08:00', '12:00', '18:00'];
+      renderTimesChips();
+      renderEmojiQuick('');
+      updateBlocks('daily');
+      modal.classList.remove('hidden');
+    }
+
+    // Modal handling
+    if (openFormBtn) openFormBtn.addEventListener('click', openTaskModal);
+    fabAdd.addEventListener('click', openTaskModal);
+    closeFormBtn.addEventListener('click', () => modal.classList.add('hidden'));
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) modal.classList.add('hidden');
+    });
+
+    typeSelect.addEventListener('change', () => updateBlocks(typeSelect.value));
+
+    function updateBlocks(type) {
+      dynamicBlocks.forEach(block => {
+        block.classList.toggle('hidden', block.dataset.type !== type);
+      });
+    }
+
+    // Add times chip for multi-times
+    function renderTimesChips() {
+      timesList.innerHTML = '';
+      multiTimesBuffer.forEach((time, idx) => {
+        const chip = document.createElement('span');
+        chip.className = 'pill px-3 py-1 flex items-center gap-2 text-xs';
+        chip.innerHTML = `${time} <button class="text-slate-400 hover:text-white" data-idx="${idx}">✕</button>`;
+        timesList.appendChild(chip);
+      });
+    }
+
+    addTimeBtn.addEventListener('click', () => {
+      const val = newTimeInput.value;
+      if (!val) return;
+      if (!multiTimesBuffer.includes(val)) {
+        multiTimesBuffer.push(val);
+        multiTimesBuffer.sort();
+        renderTimesChips();
+      }
+    });
+
+    timesList.addEventListener('click', (e) => {
+      if (e.target.tagName === 'BUTTON') {
+        const idx = Number(e.target.dataset.idx);
+        multiTimesBuffer.splice(idx,1);
+        renderTimesChips();
+      }
+    });
+
+    emojiQuick.addEventListener('click', (e) => {
+      const btn = e.target.closest('button[data-emoji]');
+      if (!btn) return;
+      emojiInput.value = btn.dataset.emoji;
+      renderEmojiQuick(btn.dataset.emoji);
+    });
+
+    emojiInput.addEventListener('input', () => {
+      renderEmojiQuick(emojiInput.value);
+    });
+
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const data = Object.fromEntries(new FormData(form));
+      const type = data.type;
+      const base = {
+        id: editingTaskId || crypto.randomUUID(),
+        title: data.title,
+        emoji: data.emoji,
+        color: data.color,
+        group: data.group,
+        type
+      };
+
+      let task = {};
+      if (type === 'daily') {
+        task = { ...base, time: data.time || '09:00' };
+      } else if (type === 'every-x-hours') {
+        task = { ...base, startTime: data.startTime || '07:00', interval: Number(data.interval) || 3 };
+      } else if (type === 'weekdays') {
+        const days = [...form.querySelectorAll('input[name="days"]:checked')].map(i => Number(i.value));
+        task = { ...base, days, weekdayTime: data.weekdayTime || '09:00' };
+      } else if (type === 'specific-dates') {
+        const dates = (data.dates || '').split(',').map(d => d.trim()).filter(Boolean);
+        task = { ...base, dates, specificTime: data.specificTime || '10:00' };
+      } else if (type === 'multi-times') {
+        task = { ...base, times: [...multiTimesBuffer] };
+      }
+
+      const existingIndex = tasks.findIndex(t => t.id === editingTaskId);
+      if (existingIndex >= 0) {
+        tasks.splice(existingIndex, 1, task);
+      } else {
+        tasks.push(task);
+      }
+      saveTasks();
+      renderFilters();
+      renderTimeline();
+      form.reset();
+      multiTimesBuffer = ['08:00', '12:00', '18:00'];
+      renderTimesChips();
+      renderEmojiQuick('');
+      updateBlocks('daily');
+      editingTaskId = null;
+      modal.classList.add('hidden');
+    });
+
+    // timeline card actions
+    timeline.addEventListener('click', (e) => {
+      const btn = e.target.closest('button[data-action]');
+      if (!btn) return;
+      const action = btn.dataset.action;
+      const id = btn.dataset.id;
+      const time = btn.dataset.time;
+      if (action === 'done') {
+        toggleDone(id, time);
+      } else if (action === 'edit') {
+        openEdit(id);
+      } else if (action === 'delete') {
+        deleteTask(id);
+      }
+    });
+
+    // Swipe to reveal actions (touch)
+    let swipeStartX = null;
+    let swipeTarget = null;
+    timeline.addEventListener('touchstart', (e) => {
+      const wrap = e.target.closest('.swipe-wrap');
+      if (!wrap) return;
+      swipeStartX = e.touches[0].clientX;
+      swipeTarget = wrap;
+    }, { passive: true });
+
+    timeline.addEventListener('touchmove', (e) => {
+      if (!swipeTarget || swipeStartX === null) return;
+      const delta = e.touches[0].clientX - swipeStartX;
+      if (delta < -30) {
+        document.querySelectorAll('.swipe-wrap.swiped').forEach(el => {
+          if (el !== swipeTarget) el.classList.remove('swiped');
+        });
+        swipeTarget.classList.add('swiped');
+      }
+      if (delta > 30) {
+        swipeTarget.classList.remove('swiped');
+      }
+    }, { passive: true });
+
+    timeline.addEventListener('touchend', () => {
+      swipeStartX = null;
+      swipeTarget = null;
+    });
+
+    // Click outside to reset swipes
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('.swipe-wrap')) {
+        document.querySelectorAll('.swipe-wrap.swiped').forEach(el => el.classList.remove('swiped'));
+      }
+    });
+
+    timeFilters.addEventListener('click', (e) => {
+      const btn = e.target.closest('button[data-time-filter]');
+      if (!btn) return;
+      filterTime = btn.dataset.timeFilter;
+      renderFilters();
+      renderTimeline();
+    });
+
+    groupFilters.addEventListener('click', (e) => {
+      const btn = e.target.closest('button[data-group-filter]');
+      if (!btn) return;
+      filterGroup = btn.dataset.groupFilter;
+      renderFilters();
+      renderTimeline();
+    });
+
+    function toggleDone(id, time) {
+      const day = todayISO();
+      completions[day] = completions[day] || {};
+      const key = occurrenceKey(id, time);
+      completions[day][key] = !completions[day][key];
+      saveCompletions();
+      renderTimeline();
+    }
+
+    function openEdit(id) {
+      const task = tasks.find(t => t.id === id);
+      if (!task) return;
+      editingTaskId = id;
+      form.elements['title'].value = task.title || '';
+      form.elements['emoji'].value = task.emoji || '';
+      renderEmojiQuick(task.emoji || '');
+      form.elements['color'].value = task.color || '#7cf8d3';
+      form.elements['group'].value = task.group || '';
+      form.elements['type'].value = task.type;
+      updateBlocks(task.type);
+
+      if (task.type === 'daily') {
+        form.elements['time'].value = task.time || '09:00';
+      } else if (task.type === 'every-x-hours') {
+        form.elements['startTime'].value = task.startTime || '07:00';
+        form.elements['interval'].value = task.interval || 3;
+      } else if (task.type === 'weekdays') {
+        form.elements['weekdayTime'].value = task.weekdayTime || '09:00';
+        const checks = form.querySelectorAll('input[name=\"days\"]');
+        checks.forEach(c => c.checked = task.days?.includes(Number(c.value)) || false);
+      } else if (task.type === 'specific-dates') {
+        form.elements['dates'].value = (task.dates || []).join(',');
+        form.elements['specificTime'].value = task.specificTime || '10:00';
+      } else if (task.type === 'multi-times') {
+        multiTimesBuffer = [...(task.times || ['08:00'])];
+        renderTimesChips();
+      }
+
+      modal.classList.remove('hidden');
+    }
+
+    function deleteTask(id) {
+      if (!confirm('¿Eliminar esta tarea?')) return;
+      tasks = tasks.filter(t => t.id !== id);
+      saveTasks();
+      renderFilters();
+      renderTimeline();
+    }
+
+    function todayISO(offsetMinutes = -300) { // default UTC-5
+      const now = new Date();
+      const utc = now.getTime() + now.getTimezoneOffset() * 60000;
+      const target = new Date(utc + offsetMinutes * 60000);
+      return target.toISOString().slice(0,10);
+    }
+
+    function ensureDailyReset() {
+      const today = todayISO();
+      const last = localStorage.getItem('ritmo_last_reset');
+      if (!last) {
+        localStorage.setItem('ritmo_last_reset', today);
+        return;
+      }
+      if (last !== today) {
+        completions = {};
+        saveCompletions();
+        localStorage.setItem('ritmo_last_reset', today);
+      }
+    }
+
+    function occurrenceKey(id, time) {
+      return `${id}|${time}`;
+    }
+
+    function updateProgress(done, total) {
+      const pct = total ? Math.round((done / total) * 100) : 0;
+      progressLabel.textContent = `Progreso ${pct}%`;
+      progressCount.textContent = `${done} / ${total}`;
+      progressBar.style.width = `${pct}%`;
+    }
+
+
+    function renderFilters() {
+      const timeOptions = [
+        { id: 'all', label: 'Todo el día' },
+        { id: 'dawn', label: 'Madrugada' },
+        { id: 'morning', label: 'Mañana' },
+        { id: 'afternoon', label: 'Tarde' },
+        { id: 'night', label: 'Noche' },
+      ];
+      timeFilters.innerHTML = '';
+      timeOptions.forEach(opt => {
+        const btn = document.createElement('button');
+        btn.className = `pill px-3 py-1 ${filterTime === opt.id ? 'ring-2 ring-accent/70' : ''}`;
+        btn.textContent = opt.label;
+        btn.dataset.timeFilter = opt.id;
+        timeFilters.appendChild(btn);
+      });
+
+      const groups = Array.from(new Set(tasks.map(t => (t.group || '').trim()).filter(Boolean)));
+      groupFilters.innerHTML = '';
+      const allBtn = document.createElement('button');
+      allBtn.className = `pill px-3 py-1 ${filterGroup === 'all' ? 'ring-2 ring-accent/70' : ''}`;
+      allBtn.textContent = 'Todos los grupos';
+      allBtn.dataset.groupFilter = 'all';
+      groupFilters.appendChild(allBtn);
+      groups.forEach(g => {
+        const btn = document.createElement('button');
+        btn.className = `pill px-3 py-1 ${filterGroup.toLowerCase() === g.toLowerCase() ? 'ring-2 ring-accent/70' : ''}`;
+        btn.textContent = g;
+        btn.dataset.groupFilter = g;
+        groupFilters.appendChild(btn);
+      });
+    }
+
+
+    // init
+    ensureDailyReset();
+
+    renderTimesChips();
+    renderEmojiQuick('');
+    updateBlocks(typeSelect.value);
+    renderFilters();
+    renderTimeline();
+  </script>
+</body>
+</html>
