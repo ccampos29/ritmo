@@ -117,6 +117,17 @@
     </section>
   </main>
 
+  <div id="confirmModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-[60] hidden">
+    <div class="glass-strong w-full max-w-sm rounded-2xl p-5 border border-white/10">
+      <h4 id="confirmTitle" class="font-semibold text-lg mb-1">Confirmar accion</h4>
+      <p id="confirmMessage" class="text-sm text-slate-300 mb-4">Esta accion no se puede deshacer.</p>
+      <div class="flex justify-end gap-2">
+        <button id="confirmCancel" type="button" class="pill px-3 py-2 text-sm">Cancelar</button>
+        <button id="confirmOk" type="button" class="px-3 py-2 text-sm rounded-md bg-red-700/90 text-white">Eliminar</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     const storageKey = 'ritmo_groups';
     const tasksKey = 'ritmo_tasks';
@@ -127,7 +138,13 @@
     const saveBtn = document.getElementById('groupSave');
     const cancelBtn = document.getElementById('groupCancel');
     const msg = document.getElementById('groupMsg');
+    const confirmModal = document.getElementById('confirmModal');
+    const confirmTitle = document.getElementById('confirmTitle');
+    const confirmMessage = document.getElementById('confirmMessage');
+    const confirmCancel = document.getElementById('confirmCancel');
+    const confirmOk = document.getElementById('confirmOk');
     let editingId = null;
+    let confirmResolver = null;
     let groups = loadGroups();
 
     function defaultGroups() {
@@ -173,6 +190,24 @@
 
     function setMessage(text) {
       msg.textContent = text || '';
+    }
+
+    function openConfirm({ title, message, okText = 'Eliminar' }) {
+      confirmTitle.textContent = title;
+      confirmMessage.textContent = message;
+      confirmOk.textContent = okText;
+      confirmModal.classList.remove('hidden');
+      return new Promise(resolve => {
+        confirmResolver = resolve;
+      });
+    }
+
+    function closeConfirm(result) {
+      confirmModal.classList.add('hidden');
+      if (confirmResolver) {
+        confirmResolver(result);
+        confirmResolver = null;
+      }
     }
 
     function startCreateMode() {
@@ -243,7 +278,7 @@
 
     cancelBtn.addEventListener('click', startCreateMode);
 
-    list.addEventListener('click', (e) => {
+    list.addEventListener('click', async (e) => {
       const btn = e.target.closest('button[data-action]');
       if (!btn) return;
       const id = btn.dataset.id;
@@ -266,13 +301,28 @@
         return;
       }
 
-      const ok = window.confirm(`Eliminar grupo "${group.name}"?`);
+      const ok = await openConfirm({
+        title: 'Eliminar grupo',
+        message: `Se eliminara "${group.name}". Esta accion no se puede deshacer.`,
+        okText: 'Eliminar'
+      });
       if (!ok) return;
       groups = groups.filter(item => item.id !== id);
       saveGroups();
       render();
       startCreateMode();
       setMessage('Grupo eliminado.');
+    });
+
+    confirmCancel.addEventListener('click', () => closeConfirm(false));
+    confirmOk.addEventListener('click', () => closeConfirm(true));
+    confirmModal.addEventListener('click', (e) => {
+      if (e.target === confirmModal) closeConfirm(false);
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && !confirmModal.classList.contains('hidden')) {
+        closeConfirm(false);
+      }
     });
 
     startCreateMode();
