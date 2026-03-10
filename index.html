@@ -214,6 +214,43 @@
       position: relative;
       z-index: 1;
     }
+    .group-chip {
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.16);
+      color: var(--text);
+      font-size: 0.82rem;
+      line-height: 1;
+      padding: 0.52rem 0.85rem;
+      white-space: nowrap;
+      border-radius: 0;
+      transition: border-color 0.18s ease, background-color 0.18s ease, color 0.18s ease;
+    }
+    .group-chip.active {
+      background: rgba(143, 244, 216, 0.16);
+      border-color: rgba(143, 244, 216, 0.8);
+      color: #d6fff5;
+    }
+    .group-chip-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 9999px;
+      display: inline-block;
+    }
+    .view-toggle {
+      display: inline-flex;
+      border: 1px solid rgba(255,255,255,0.16);
+      background: rgba(255,255,255,0.06);
+    }
+    .view-toggle-btn {
+      padding: 0.5rem 0.78rem;
+      font-size: 0.78rem;
+      color: var(--muted);
+      transition: background-color 0.18s ease, color 0.18s ease;
+    }
+    .view-toggle-btn.active {
+      background: rgba(143, 244, 216, 0.16);
+      color: #d6fff5;
+    }
     #fabAdd {
       bottom: calc(20px + env(safe-area-inset-bottom));
       z-index: 70;
@@ -298,6 +335,17 @@
         <div class="h-3 rounded-full bg-white/5 overflow-hidden">
           <div id="progressBar" class="h-full w-0 bg-gradient-to-r from-accent to-highlight transition-all duration-300"></div>
         </div>
+      </div>
+
+      <div class="mb-4 space-y-2">
+        <div class="flex items-center justify-between gap-2">
+          <p class="text-xs uppercase tracking-[0.2em] text-slate-400">Vista por grupos</p>
+          <div id="viewModeSwitch" class="view-toggle">
+            <button type="button" class="view-toggle-btn active" data-view-mode="time">Por hora</button>
+            <button type="button" class="view-toggle-btn" data-view-mode="group">Por grupo</button>
+          </div>
+        </div>
+        <div id="groupFilters" class="flex gap-2 overflow-x-auto pb-1 sm:flex-wrap sm:overflow-visible"></div>
       </div>
 
       <div class="relative overflow-x-hidden" id="timelineWrapper">
@@ -425,6 +473,8 @@
     const progressLabel = document.getElementById('progressLabel');
     const progressCount = document.getElementById('progressCount');
     const progressBar = document.getElementById('progressBar');
+    const groupFilters = document.getElementById('groupFilters');
+    const viewModeSwitch = document.getElementById('viewModeSwitch');
     const fabAdd = document.getElementById('fabAdd');
     const nextTaskEmoji = document.getElementById('nextTaskEmoji');
     const nextTaskTitle = document.getElementById('nextTaskTitle');
@@ -441,6 +491,8 @@
     let completions = loadCompletions();
     let multiTimesBuffer = ['08:00', '12:00', '18:00'];
     let editingTaskId = null;
+    let activeGroupFilter = loadStoredGroupFilter();
+    let viewMode = loadStoredViewMode();
     const VIRTUAL_ROW_HEIGHT = 96;
     const VIRTUAL_OVERSCAN = 8;
     let virtualModel = null;
@@ -450,6 +502,39 @@
 
     function formatDateLabel(date = new Date()) {
       return date.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
+    }
+
+    function loadStoredViewMode() {
+      try {
+        const value = localStorage.getItem('ritmo_view_mode');
+        return value === 'group' ? 'group' : 'time';
+      } catch (e) {
+        return 'time';
+      }
+    }
+
+    function saveStoredViewMode() {
+      try {
+        localStorage.setItem('ritmo_view_mode', viewMode);
+      } catch (e) {
+        // no-op
+      }
+    }
+
+    function loadStoredGroupFilter() {
+      try {
+        return localStorage.getItem('ritmo_active_group_filter') || 'all';
+      } catch (e) {
+        return 'all';
+      }
+    }
+
+    function saveStoredGroupFilter() {
+      try {
+        localStorage.setItem('ritmo_active_group_filter', activeGroupFilter);
+      } catch (e) {
+        // no-op
+      }
     }
 
     function loadTasks() {
@@ -596,6 +681,45 @@
       return group ? group.color : (task.color || '#7cf8d3');
     }
 
+    function resolveTaskGroupMeta(task) {
+      const matched = resolveGroupByTask(task);
+      if (matched) return matched;
+      return { id: 'general', name: task.group || 'General', color: task.color || '#7cf8d3' };
+    }
+
+    function filterOccurrencesByGroup(entries) {
+      if (activeGroupFilter === 'all') return entries;
+      return entries.filter(entry => resolveTaskGroupMeta(entry.task).id === activeGroupFilter);
+    }
+
+    function renderGroupFilters() {
+      if (!groupFilters) return;
+      const allGroups = [{ id: 'all', name: 'Todos', color: '#8ff4d8' }, ...groups];
+      if (!allGroups.some(group => group.id === activeGroupFilter)) {
+        activeGroupFilter = 'all';
+        saveStoredGroupFilter();
+      }
+      groupFilters.innerHTML = '';
+      const frag = document.createDocumentFragment();
+      allGroups.forEach(group => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = `group-chip inline-flex items-center gap-2 ${group.id === activeGroupFilter ? 'active' : ''}`;
+        btn.dataset.groupFilter = group.id;
+        btn.innerHTML = `<span class="group-chip-dot" style="background:${group.color}"></span><span>${group.name}</span>`;
+        frag.appendChild(btn);
+      });
+      groupFilters.appendChild(frag);
+    }
+
+    function renderViewModeSwitch() {
+      if (!viewModeSwitch) return;
+      viewModeSwitch.querySelectorAll('button[data-view-mode]').forEach(btn => {
+        const isActive = btn.dataset.viewMode === viewMode;
+        btn.classList.toggle('active', isActive);
+      });
+    }
+
     function renderGroupOptions(selectedId = '') {
       const nextSelected = selectedId || groupSelect.value;
       groupSelect.innerHTML = '';
@@ -649,11 +773,12 @@
       return `${s}s`;
     }
 
-    function renderNextTaskCard() {
+    function renderNextTaskCard(entries = null, doneMapInput = null) {
       const now = new Date();
       const todayKey = todayISO();
-      const occurrences = collectTodayOccurrences();
-      const doneMap = completions[todayKey] || {};
+      const source = entries || filterOccurrencesByGroup(collectTodayOccurrences());
+      const occurrences = [...source].sort((a, b) => a.time.localeCompare(b.time));
+      const doneMap = doneMapInput || completions[todayKey] || {};
 
       if (occurrences.length === 0) {
         nextTaskEmoji.textContent = '⏭';
@@ -722,11 +847,14 @@
       });
     }
 
-    function buildTimelineRow(entry, done, index) {
+    function buildTimelineRow(entry, done, options = {}) {
+      const { virtual = false, index = 0 } = options;
       const row = document.createElement('div');
-      row.className = 'absolute left-0 right-0 swipe-wrap';
-      row.style.top = `${index * VIRTUAL_ROW_HEIGHT}px`;
-      row.style.height = `${VIRTUAL_ROW_HEIGHT}px`;
+      row.className = virtual ? 'absolute left-0 right-0 swipe-wrap' : 'relative swipe-wrap';
+      if (virtual) {
+        row.style.top = `${index * VIRTUAL_ROW_HEIGHT}px`;
+        row.style.height = `${VIRTUAL_ROW_HEIGHT}px`;
+      }
       row.dataset.id = entry.task.id;
       row.dataset.time = entry.time;
 
@@ -745,7 +873,8 @@
       const card = document.createElement('article');
       const taskColor = resolveTaskColor(entry.task);
       const taskGroup = resolveTaskGroup(entry.task);
-      card.className = `glass-strong card-bg rounded-none px-4 py-3 border border-white/10 flex items-center gap-3 hover:border-white/30 transition card-inner h-full ${done ? 'done-card collapsed-card' : ''}`;
+      const sizeClass = virtual ? 'h-full' : 'min-h-[86px]';
+      card.className = `glass-strong card-bg rounded-none px-4 py-3 border border-white/10 flex items-center gap-3 hover:border-white/30 transition card-inner ${sizeClass} ${done ? 'done-card collapsed-card' : ''}`;
       card.style.borderLeft = `6px solid ${taskColor}`;
       card.innerHTML = `
         <button class="check-btn ${done ? 'checked' : ''}" data-action="done" data-id="${entry.task.id}" data-time="${entry.time}">${done ? '✔' : ''}</button>
@@ -758,6 +887,51 @@
       `;
       row.appendChild(card);
       return row;
+    }
+
+    function renderGroupedTimeline(entries, doneMap) {
+      clearVirtualTimeline();
+      if (entries.length === 0) return;
+
+      const grouped = new Map();
+      entries.forEach(entry => {
+        const meta = resolveTaskGroupMeta(entry.task);
+        const key = meta.id || meta.name;
+        if (!grouped.has(key)) grouped.set(key, { meta, items: [] });
+        grouped.get(key).items.push(entry);
+      });
+
+      const sections = [...grouped.values()].sort((a, b) => a.meta.name.localeCompare(b.meta.name));
+      const frag = document.createDocumentFragment();
+
+      sections.forEach(section => {
+        section.items.sort((a, b) => a.time.localeCompare(b.time));
+
+        const container = document.createElement('section');
+        container.className = 'mb-3';
+
+        const header = document.createElement('div');
+        header.className = 'flex items-center justify-between border border-white/10 border-b-0 px-3 py-2 bg-white/5';
+        header.innerHTML = `
+          <div class="flex items-center gap-2 min-w-0">
+            <span class="w-2.5 h-2.5 shrink-0" style="background:${section.meta.color}"></span>
+            <p class="text-sm font-semibold card-title truncate">${section.meta.name}</p>
+          </div>
+          <p class="text-xs text-slate-400">${section.items.length}</p>
+        `;
+        container.appendChild(header);
+
+        const listEl = document.createElement('div');
+        listEl.className = 'space-y-0';
+        section.items.forEach(entry => {
+          const done = !!doneMap[occurrenceKey(entry.task.id, entry.time)];
+          listEl.appendChild(buildTimelineRow(entry, done));
+        });
+        container.appendChild(listEl);
+        frag.appendChild(container);
+      });
+
+      timeline.appendChild(frag);
     }
 
     function renderVirtualWindow() {
@@ -785,7 +959,7 @@
       for (let i = start; i <= end; i++) {
         const entry = entries[i];
         const done = !!doneMap[occurrenceKey(entry.task.id, entry.time)];
-        frag.appendChild(buildTimelineRow(entry, done, i));
+        frag.appendChild(buildTimelineRow(entry, done, { virtual: true, index: i }));
       }
 
       timeline.innerHTML = '';
@@ -822,9 +996,12 @@
 
     function renderTimeline() {
       ensureDailyReset();
+      groups = loadGroups();
       todayLabel.textContent = formatDateLabel();
+      renderGroupFilters();
+      renderViewModeSwitch();
       const todayKey = todayISO();
-      const sorted = collectTodayOccurrences();
+      const sorted = filterOccurrencesByGroup(collectTodayOccurrences()).sort((a, b) => a.time.localeCompare(b.time));
       const total = sorted.length;
       const doneMap = completions[todayKey] || {};
       const completed = sorted.reduce((count, entry) => {
@@ -848,17 +1025,27 @@
         clearVirtualTimeline();
         const noToday = document.createElement('div');
         noToday.className = 'glass-card rounded-2xl p-5 text-slate-200';
-        noToday.innerHTML = `<p class="text-lg font-semibold mb-1">Sin ocurrencias para hoy</p>
-        <p class="text-slate-400">Tus tareas existen, pero ninguna aplica para este dia segun su frecuencia.</p>`;
+        if (activeGroupFilter === 'all') {
+          noToday.innerHTML = `<p class="text-lg font-semibold mb-1">Sin ocurrencias para hoy</p>
+          <p class="text-slate-400">Tus tareas existen, pero ninguna aplica para este dia segun su frecuencia.</p>`;
+        } else {
+          const group = groups.find(item => item.id === activeGroupFilter);
+          noToday.innerHTML = `<p class="text-lg font-semibold mb-1">Sin tareas en este grupo</p>
+          <p class="text-slate-400">${group ? group.name : 'El grupo seleccionado'} no tiene ocurrencias para hoy.</p>`;
+        }
         timeline.appendChild(noToday);
         updateProgress(0, 0);
-        renderNextTaskCard();
+        renderNextTaskCard(sorted, doneMap);
         return;
       }
 
-      mountVirtualTimeline(sorted, doneMap);
+      if (viewMode === 'group') {
+        renderGroupedTimeline(sorted, doneMap);
+      } else {
+        mountVirtualTimeline(sorted, doneMap);
+      }
       updateProgress(completed, total);
-      renderNextTaskCard();
+      renderNextTaskCard(sorted, doneMap);
     }
 
     function openTaskModal() {
@@ -892,6 +1079,20 @@
 
     typeSelect.addEventListener('change', () => updateBlocks(typeSelect.value));
     groupSelect.addEventListener('change', updateGroupHint);
+    groupFilters.addEventListener('click', (e) => {
+      const btn = e.target.closest('button[data-group-filter]');
+      if (!btn) return;
+      activeGroupFilter = btn.dataset.groupFilter || 'all';
+      saveStoredGroupFilter();
+      renderTimeline();
+    });
+    viewModeSwitch.addEventListener('click', (e) => {
+      const btn = e.target.closest('button[data-view-mode]');
+      if (!btn) return;
+      viewMode = btn.dataset.viewMode === 'group' ? 'group' : 'time';
+      saveStoredViewMode();
+      renderTimeline();
+    });
 
     function updateBlocks(type) {
       dynamicBlocks.forEach(block => {
