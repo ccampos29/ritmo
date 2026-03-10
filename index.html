@@ -2,7 +2,10 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#0a0f1d" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <title>Ritmo — Planificador en línea de tiempo</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
@@ -63,6 +66,7 @@
       overflow-x: hidden;
       overscroll-behavior-x: none;
       overscroll-behavior-y: none;
+      background-color: var(--bg);
     }
     body {
       background: radial-gradient(circle at 20% 20%, rgba(124, 248, 211, 0.08), transparent 32%),
@@ -71,6 +75,8 @@
                   linear-gradient(180deg, var(--bg-2), var(--bg));
       color: var(--text);
       min-height: 100dvh;
+      padding-top: env(safe-area-inset-top);
+      padding-bottom: env(safe-area-inset-bottom);
       transition: background 0.3s ease, color 0.3s ease;
     }
     *, ::before, ::after { --tw-shadow-color: initial; }
@@ -206,6 +212,9 @@
       will-change: transform;
       position: relative;
       z-index: 1;
+    }
+    #fabAdd {
+      bottom: calc(20px + env(safe-area-inset-bottom));
     }
   </style>
 </head>
