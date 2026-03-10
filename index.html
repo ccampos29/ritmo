@@ -227,6 +227,23 @@
       </div>
     </header>
 
+    <section id="nextTaskCard" class="glass-card rounded-2xl p-4 mb-4 sticky top-3 z-30">
+      <div class="flex items-center justify-between gap-3">
+        <div class="flex items-center gap-3 min-w-0">
+          <div id="nextTaskEmoji" class="w-10 h-10 rounded-xl bg-accent/10 text-accent flex items-center justify-center text-xl">⏭</div>
+          <div class="min-w-0">
+            <p class="text-[11px] uppercase tracking-[0.18em] text-slate-400">Siguiente tarea</p>
+            <p id="nextTaskTitle" class="font-semibold text-base card-title truncate">Sin tareas para hoy</p>
+            <p id="nextTaskMeta" class="text-xs card-sub truncate">Crea una tarea y aparece aqui.</p>
+          </div>
+        </div>
+        <div class="text-right shrink-0">
+          <p class="text-[11px] uppercase tracking-[0.18em] text-slate-400">Cuenta regresiva</p>
+          <p id="nextTaskCountdown" class="font-semibold text-base card-title">--</p>
+        </div>
+      </div>
+    </section>
+
     <section class="glass-card rounded-3xl p-5 sm:p-6 shadow-glass relative overflow-hidden">
       <div class="absolute inset-0 pointer-events-none opacity-40" aria-hidden="true">
         <div class="absolute -left-32 top-10 w-72 h-72 bg-gradient-to-br from-accent/10 to-white/5 rounded-full blur-3xl"></div>
@@ -253,7 +270,7 @@
       </div>
 
       <div class="relative overflow-x-hidden" id="timelineWrapper">
-        <div id="timeline" class="relative flex flex-col gap-4 min-w-full pt-2 pb-2"></div>
+        <div id="timeline" class="relative min-w-full pt-2 pb-2"></div>
       </div>
     </section>
 
@@ -365,11 +382,20 @@
     const progressCount = document.getElementById('progressCount');
     const progressBar = document.getElementById('progressBar');
     const fabAdd = document.getElementById('fabAdd');
+    const nextTaskEmoji = document.getElementById('nextTaskEmoji');
+    const nextTaskTitle = document.getElementById('nextTaskTitle');
+    const nextTaskMeta = document.getElementById('nextTaskMeta');
+    const nextTaskCountdown = document.getElementById('nextTaskCountdown');
 
     let tasks = loadTasks();
     let completions = loadCompletions();
     let multiTimesBuffer = ['08:00', '12:00', '18:00'];
     let editingTaskId = null;
+    const VIRTUAL_ROW_HEIGHT = 96;
+    const VIRTUAL_OVERSCAN = 8;
+    let virtualModel = null;
+    let virtualRaf = null;
+    let virtualListenersBound = false;
 
     function formatDateLabel(date = new Date()) {
       return date.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
@@ -473,71 +499,213 @@
       }
     }
 
+    function collectTodayOccurrences() {
+      const list = [];
+      tasks.forEach(task => {
+        const times = getOccurrencesForToday(task).map(time => ({ time, task }));
+        list.push(...times);
+      });
+      return list.sort((a, b) => a.time.localeCompare(b.time));
+    }
+
+    function timeToDate(time, date = new Date()) {
+      const [h, m] = time.split(':').map(Number);
+      const target = new Date(date);
+      target.setHours(h, m, 0, 0);
+      return target;
+    }
+
+    function formatDuration(ms) {
+      const totalSec = Math.max(0, Math.floor(ms / 1000));
+      const h = Math.floor(totalSec / 3600);
+      const m = Math.floor((totalSec % 3600) / 60);
+      const s = totalSec % 60;
+      if (h > 0) return `${h}h ${m}m`;
+      if (m > 0) return `${m}m ${s}s`;
+      return `${s}s`;
+    }
+
+    function renderNextTaskCard() {
+      const now = new Date();
+      const todayKey = todayISO();
+      const occurrences = collectTodayOccurrences();
+      const doneMap = completions[todayKey] || {};
+
+      if (occurrences.length === 0) {
+        nextTaskEmoji.textContent = '⏭';
+        nextTaskTitle.textContent = 'Sin tareas para hoy';
+        nextTaskMeta.textContent = 'Crea una tarea y aparece aqui.';
+        nextTaskCountdown.textContent = '--';
+        return;
+      }
+
+      const pending = occurrences.filter(entry => !doneMap[occurrenceKey(entry.task.id, entry.time)]);
+      if (pending.length === 0) {
+        nextTaskEmoji.textContent = '✅';
+        nextTaskTitle.textContent = 'Todo completado por hoy';
+        nextTaskMeta.textContent = 'Buen ritmo. No hay pendientes.';
+        nextTaskCountdown.textContent = '0 pendientes';
+        return;
+      }
+
+      let target = pending.find(entry => timeToDate(entry.time, now) >= now);
+      let overdue = false;
+      if (!target) {
+        target = pending[0];
+        overdue = true;
+      }
+
+      const targetDate = timeToDate(target.time, now);
+      const diff = targetDate.getTime() - now.getTime();
+      const emoji = target.task.emoji?.trim() || '•';
+      const group = target.task.group?.trim() || 'General';
+
+      nextTaskEmoji.textContent = emoji;
+      nextTaskTitle.textContent = target.task.title;
+      if (overdue) {
+        nextTaskMeta.textContent = `${group} · pendiente desde ${target.time}`;
+        nextTaskCountdown.textContent = `atrasada ${formatDuration(Math.abs(diff))}`;
+      } else {
+        nextTaskMeta.textContent = `${group} · ${target.time}`;
+        nextTaskCountdown.textContent = `en ${formatDuration(diff)}`;
+      }
+    }
+
+    function buildTimelineRow(entry, done, index) {
+      const row = document.createElement('div');
+      row.className = 'absolute left-0 right-0 swipe-wrap';
+      row.style.top = `${index * VIRTUAL_ROW_HEIGHT}px`;
+      row.style.height = `${VIRTUAL_ROW_HEIGHT}px`;
+      row.dataset.id = entry.task.id;
+      row.dataset.time = entry.time;
+
+      const actions = document.createElement('div');
+      actions.className = 'swipe-actions';
+      actions.innerHTML = `
+        <button class="swipe-edit" data-action="edit" data-id="${entry.task.id}">
+          <span class="swipe-label">Editar</span>
+        </button>
+        <button class="swipe-delete" data-action="delete" data-id="${entry.task.id}">
+          <span class="swipe-label">Eliminar</span>
+        </button>
+      `;
+      row.appendChild(actions);
+
+      const card = document.createElement('article');
+      card.className = `glass-strong card-bg rounded-none px-4 py-3 border border-white/10 flex items-center gap-3 hover:border-white/30 transition card-inner h-full ${done ? 'done-card collapsed-card' : ''}`;
+      card.style.borderLeft = `6px solid ${entry.task.color || '#7cf8d3'}`;
+      card.innerHTML = `
+        <button class="check-btn ${done ? 'checked' : ''}" data-action="done" data-id="${entry.task.id}" data-time="${entry.time}">${done ? '✔' : ''}</button>
+        <div class="avatar w-10 h-10 rounded-xl flex items-center justify-center text-xl" style="background:${entry.task.color || '#7cf8d3'}22; color:${entry.task.color || '#7cf8d3'}">${entry.task.emoji || '•'}</div>
+        <div class="flex-1 card-main">
+          <p class="text-xs uppercase tracking-[0.2em] time-label">${entry.time}</p>
+          <p class="font-semibold text-base card-title">${entry.task.title}</p>
+          <p class="card-sub text-xs">${entry.task.group || 'General'}</p>
+        </div>
+      `;
+      row.appendChild(card);
+      return row;
+    }
+
+    function renderVirtualWindow() {
+      if (!virtualModel) return;
+      const { entries, doneMap } = virtualModel;
+      const totalHeight = entries.length * VIRTUAL_ROW_HEIGHT;
+      timeline.style.height = `${totalHeight}px`;
+
+      const wrapperRect = timelineWrapper.getBoundingClientRect();
+      const listTop = window.scrollY + wrapperRect.top;
+      const viewTop = window.scrollY;
+      const viewBottom = viewTop + window.innerHeight;
+
+      let start = Math.floor((viewTop - listTop) / VIRTUAL_ROW_HEIGHT) - VIRTUAL_OVERSCAN;
+      let end = Math.ceil((viewBottom - listTop) / VIRTUAL_ROW_HEIGHT) + VIRTUAL_OVERSCAN;
+      start = Math.max(0, start);
+      end = Math.min(entries.length - 1, end);
+
+      if (entries.length === 0 || end < start) {
+        timeline.innerHTML = '';
+        return;
+      }
+
+      const frag = document.createDocumentFragment();
+      for (let i = start; i <= end; i++) {
+        const entry = entries[i];
+        const done = !!doneMap[occurrenceKey(entry.task.id, entry.time)];
+        frag.appendChild(buildTimelineRow(entry, done, i));
+      }
+
+      timeline.innerHTML = '';
+      timeline.appendChild(frag);
+    }
+
+    function scheduleVirtualRender() {
+      if (!virtualModel) return;
+      if (virtualRaf) return;
+      virtualRaf = requestAnimationFrame(() => {
+        virtualRaf = null;
+        renderVirtualWindow();
+      });
+    }
+
+    function bindVirtualListeners() {
+      if (virtualListenersBound) return;
+      virtualListenersBound = true;
+      window.addEventListener('scroll', scheduleVirtualRender, { passive: true });
+      window.addEventListener('resize', scheduleVirtualRender);
+    }
+
+    function mountVirtualTimeline(entries, doneMap) {
+      virtualModel = { entries, doneMap };
+      bindVirtualListeners();
+      renderVirtualWindow();
+    }
+
+    function clearVirtualTimeline() {
+      virtualModel = null;
+      timeline.style.height = '';
+      timeline.innerHTML = '';
+    }
+
     function renderTimeline() {
       ensureDailyReset();
       todayLabel.textContent = formatDateLabel();
-      timeline.innerHTML = '';
-      const occurrences = [];
       const todayKey = todayISO();
-
-      tasks.forEach(task => {
-        const times = getOccurrencesForToday(task).map(time => ({ time, task }));
-        occurrences.push(...times);
-      });
-
-      const sorted = occurrences.sort((a, b) => a.time.localeCompare(b.time));
+      const sorted = collectTodayOccurrences();
       const total = sorted.length;
-      let completed = 0;
+      const doneMap = completions[todayKey] || {};
+      const completed = sorted.reduce((count, entry) => {
+        return count + (doneMap[occurrenceKey(entry.task.id, entry.time)] ? 1 : 0);
+      }, 0);
 
       // timeline vertical rail
       if (tasks.length === 0) {
+        clearVirtualTimeline();
         const empty = document.createElement('div');
         empty.className = 'glass-card rounded-2xl p-5 text-slate-200';
         empty.innerHTML = `<p class="text-lg font-semibold mb-1">No hay tareas aún</p>
         <p class="text-slate-400">Pulsa el botón + para crear tu primera rutina. Elige tipo de frecuencia y añade horarios.</p>`;
         timeline.appendChild(empty);
-        updateProgress(0,0);
+        updateProgress(0, 0);
+        renderNextTaskCard();
         return;
       }
 
-      sorted.forEach(entry => {
-        const done = (completions[todayKey] || {})[occurrenceKey(entry.task.id, entry.time)];
-        if (done) completed++;
+      if (sorted.length === 0) {
+        clearVirtualTimeline();
+        const noToday = document.createElement('div');
+        noToday.className = 'glass-card rounded-2xl p-5 text-slate-200';
+        noToday.innerHTML = `<p class="text-lg font-semibold mb-1">Sin ocurrencias para hoy</p>
+        <p class="text-slate-400">Tus tareas existen, pero ninguna aplica para este dia segun su frecuencia.</p>`;
+        timeline.appendChild(noToday);
+        updateProgress(0, 0);
+        renderNextTaskCard();
+        return;
+      }
 
-        const row = document.createElement('div');
-        row.className = 'relative swipe-wrap';
-        row.dataset.id = entry.task.id;
-        row.dataset.time = entry.time;
-
-        const actions = document.createElement('div');
-        actions.className = 'pl-2 swipe-actions';
-        actions.innerHTML = `
-          <button class="swipe-edit" data-action="edit" data-id="${entry.task.id}">
-            <span class="swipe-label">Editar</span>
-          </button>
-          <button class="swipe-delete" data-action="delete" data-id="${entry.task.id}">
-            <span class="swipe-label">Eliminar</span>
-          </button>
-        `;
-        row.appendChild(actions);
-
-        const card = document.createElement('article');
-        card.className = `glass-strong card-bg rounded-none px-4 py-3 border border-white/10 flex items-center gap-3 hover:border-white/30 transition card-inner ${done ? 'done-card collapsed-card' : ''}`;
-        card.style.borderLeft = `6px solid ${entry.task.color || '#7cf8d3'}`;
-        card.innerHTML = `
-          <button class="check-btn ${done ? 'checked' : ''}" data-action="done" data-id="${entry.task.id}" data-time="${entry.time}">${done ? '✔' : ''}</button>
-          <div class="avatar w-10 h-10 rounded-xl flex items-center justify-center text-xl" style="background:${entry.task.color || '#7cf8d3'}22; color:${entry.task.color || '#7cf8d3'}">${entry.task.emoji || '•'}</div>
-          <div class="flex-1 card-main">
-            <p class="text-xs uppercase tracking-[0.2em] time-label">${entry.time}</p>
-            <p class="font-semibold text-base card-title">${entry.task.title}</p>
-            <p class="card-sub text-xs">${entry.task.group || 'General'}</p>
-          </div>
-        `;
-        row.appendChild(card);
-        timeline.appendChild(row);
-      });
-
+      mountVirtualTimeline(sorted, doneMap);
       updateProgress(completed, total);
+      renderNextTaskCard();
     }
 
     function openTaskModal() {
@@ -776,6 +944,18 @@
     renderTimesChips();
     updateBlocks(typeSelect.value);
     renderTimeline();
+
+    // Keep countdown live and handle day rollover.
+    let liveDayKey = todayISO();
+    setInterval(() => {
+      const currentKey = todayISO();
+      if (currentKey !== liveDayKey) {
+        liveDayKey = currentKey;
+        renderTimeline();
+        return;
+      }
+      renderNextTaskCard();
+    }, 1000);
   </script>
 </body>
 </html>
