@@ -67,6 +67,7 @@
       overscroll-behavior-x: none;
       overscroll-behavior-y: none;
       background-color: var(--bg);
+      -webkit-text-size-adjust: 100%;
     }
     body {
       background: radial-gradient(circle at 20% 20%, rgba(124, 248, 211, 0.08), transparent 32%),
@@ -215,6 +216,12 @@
     }
     #fabAdd {
       bottom: calc(20px + env(safe-area-inset-bottom));
+    }
+    /* Prevent iOS Safari focus zoom on form controls */
+    input,
+    select,
+    textarea {
+      font-size: 16px !important;
     }
   </style>
 </head>
