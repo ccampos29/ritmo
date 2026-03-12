@@ -1,0 +1,241 @@
+    :root {
+      --bg: #0a0f1d;
+      --bg-2: #0e1426;
+      --card: rgba(18,24,39,0.96);
+      --card-strong: rgba(24,32,50,0.98);
+      --card-glow: rgba(255,255,255,0.08);
+      --text: #e5e7eb;
+      --text-strong: #f8fafc;
+      --muted: #c5cfda;
+      --rail: rgba(148,163,184,0.45);
+      --accent: #8ff4d8;
+      --highlight: #b1c7ff;
+      --stroke: rgba(255,255,255,0.22);
+      --pill-bg: rgba(255,255,255,0.10);
+      --pill-border: rgba(255,255,255,0.12);
+    }
+    body.hc {
+      --card: rgba(22,28,45,0.98);
+      --card-strong: rgba(26,33,52,0.99);
+      --card-glow: rgba(255,255,255,0.14);
+      --text: #f9fafb;
+      --text-strong: #ffffff;
+      --muted: #e2e8f0;
+      --stroke: rgba(255,255,255,0.38);
+      --pill-bg: rgba(255,255,255,0.14);
+      --pill-border: rgba(255,255,255,0.2);
+    }
+    /* Light theme removido; solo dark */
+    html,
+    body {
+      background: linear-gradient(180deg, var(--bg-2), var(--bg));
+      min-height: 100%;
+      overflow-x: hidden;
+      overscroll-behavior-x: none;
+      overscroll-behavior-y: none;
+      background-color: var(--bg);
+      -webkit-text-size-adjust: 100%;
+    }
+    body {
+      background: radial-gradient(circle at 20% 20%, rgba(124, 248, 211, 0.08), transparent 32%),
+                  radial-gradient(circle at 80% 10%, rgba(168, 197, 255, 0.1), transparent 30%),
+                  radial-gradient(circle at 50% 90%, rgba(255, 255, 255, 0.04), transparent 30%),
+                  linear-gradient(180deg, var(--bg-2), var(--bg));
+      color: var(--text);
+      min-height: 100dvh;
+      padding-top: env(safe-area-inset-top);
+      padding-bottom: env(safe-area-inset-bottom);
+      transition: background 0.3s ease, color 0.3s ease;
+    }
+    *, ::before, ::after { --tw-shadow-color: initial; }
+    .glass-card {
+      background: var(--card);
+      border: 1px solid rgba(255,255,255,0.08);
+      box-shadow: none;
+    }
+    .glass-strong {
+      background: var(--card-strong);
+      border: 1px solid rgba(255,255,255,0.12);
+      box-shadow: none;
+    }
+    .timeline-dot {
+      box-shadow: 0 0 0 6px rgba(124,248,211,0.12);
+    }
+    .pill {
+      background: var(--pill-bg);
+      border: 1px solid var(--pill-border);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+    }
+    .done-card {
+      opacity: 0.5;
+      filter: grayscale(0.35);
+    }
+    .shadow-glass { box-shadow: none !important; }
+    .collapsed-card .card-main {
+      display: block;
+      flex: 0 1 auto;
+      min-width: 0;
+    }
+    .collapsed-card .time-label,
+    .collapsed-card .card-sub { display: none; }
+    .collapsed-card .card-title {
+      font-size: 1rem;
+      line-height: 1.2;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .collapsed-card { padding: 12px 14px; }
+    .collapsed-card .avatar { margin-right: 0; }
+    .card-title {
+      color: var(--text-strong) !important;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.25);
+    }
+    .card-sub { color: var(--muted); }
+    .time-label { color: var(--muted); font-weight: 600; letter-spacing: 0.08em; }
+    .card-bg { background: transparent; }
+    .check-btn {
+      width: 36px; height: 36px;
+      border-radius: 9999px;
+      border: 2px solid var(--stroke);
+      display: inline-flex; align-items: center; justify-content: center;
+      background: rgba(255,255,255,0.07);
+      color: var(--text);
+      transition: all 0.15s ease;
+    }
+    .check-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .check-btn.checked {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #0b0f1d;
+    }
+    .floating-bg {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background: radial-gradient(circle at 15% 50%, rgba(124, 248, 211, 0.08), transparent 22%),
+                  radial-gradient(circle at 85% 30%, rgba(255, 168, 205, 0.07), transparent 24%),
+                  radial-gradient(circle at 50% 50%, rgba(255,255,255,0.04), transparent 30%);
+      filter: blur(80px);
+      opacity: 0.75;
+    }
+    .swipe-wrap {
+      --swipe-width: 176px;
+      position: relative;
+      overflow: hidden;
+    }
+    .swipe-actions {
+      position: absolute;
+      top: 0;
+      right: 8px;
+      bottom: 0;
+      width: var(--swipe-width);
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      border-radius: 0;
+      overflow: hidden;
+      pointer-events: none;
+      opacity: 0;
+      visibility: hidden;
+      transform: translateX(16px);
+      transition: opacity 0.18s ease, transform 0.18s ease, visibility 0.18s ease;
+      z-index: 0;
+    }
+    .swiped .swipe-actions {
+      opacity: 1;
+      visibility: visible;
+      transform: translateX(0);
+    }
+    .swipe-actions button {
+      pointer-events: auto;
+      border: 0;
+      color: #f8fafc;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      transition: filter 0.18s ease;
+    }
+    .swipe-actions button:hover {
+      filter: brightness(1.08);
+    }
+    .swipe-edit {
+      background: rgba(71, 85, 105, 0.9);
+    }
+    .swipe-delete {
+      background: rgba(185, 28, 28, 0.9);
+    }
+    .swipe-label {
+      display: inline-flex;
+      width: 100%;
+      height: 100%;
+      align-items: center;
+      justify-content: center;
+    }
+    .swiped .card-inner {
+      transform: translateX(calc(-1 * var(--swipe-width)));
+    }
+    .card-inner {
+      transition: transform 0.2s ease;
+      will-change: transform;
+      position: relative;
+      z-index: 1;
+    }
+    .group-chip {
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.16);
+      color: var(--text);
+      font-size: 0.82rem;
+      line-height: 1;
+      padding: 0.52rem 0.85rem;
+      white-space: nowrap;
+      border-radius: 0;
+      transition: border-color 0.18s ease, background-color 0.18s ease, color 0.18s ease;
+    }
+    .group-chip.active {
+      background: rgba(143, 244, 216, 0.16);
+      border-color: rgba(143, 244, 216, 0.8);
+      color: #d6fff5;
+    }
+    .group-chip-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 9999px;
+      display: inline-block;
+    }
+    .view-toggle {
+      display: inline-flex;
+      border: 1px solid rgba(255,255,255,0.16);
+      background: rgba(255,255,255,0.06);
+    }
+    .view-toggle-btn {
+      padding: 0.5rem 0.78rem;
+      font-size: 0.78rem;
+      color: var(--muted);
+      transition: background-color 0.18s ease, color 0.18s ease;
+    }
+    .view-toggle-btn.active {
+      background: rgba(143, 244, 216, 0.16);
+      color: #d6fff5;
+    }
+    #fabAdd {
+      bottom: calc(20px + env(safe-area-inset-bottom));
+      z-index: 70;
+      pointer-events: auto;
+      touch-action: manipulation;
+    }
+    /* Prevent iOS Safari focus zoom on form controls */
+    input,
+    select,
+    textarea {
+      font-size: 16px !important;
+    }
+    #taskForm input[type="time"] {
+      inline-size: 100%;
+      min-inline-size: 0;
+      max-inline-size: 100%;
+      box-sizing: border-box;
+    }
+    #taskForm .grid > label {
+      min-width: 0;
+    }

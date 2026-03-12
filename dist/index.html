@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <!-- Generado por scripts/build-pages.sh -->
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#0a0f1d" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>Ritmo — Planificador en línea de tiempo</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="assets/js/tailwind.index.config.js"></script>
+  <link rel="stylesheet" href="assets/css/index.css" />
+</head>
+<body class="text-slate-100 font-body antialiased">
+
+  <div class="floating-bg"></div>
+
+  <div class="relative max-w-5xl mx-auto px-4 pb-28 pt-10 sm:pt-14">
+    <header class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
+      <div>
+        <p class="uppercase text-xs tracking-[0.3em] text-slate-400">Ritmo diario</p>
+        <h1 class="font-display text-3xl sm:text-4xl font-semibold flex items-center gap-2">
+          Tu línea del día
+        </h1>
+        <div class="mt-2">
+          <a href="groups.html" class="pill inline-flex px-3 py-2 text-sm text-slate-100">Grupos</a>
+        </div>
+      </div>
+      <div class="glass-card rounded-2xl px-4 py-3 flex items-center gap-3 shadow-glass">
+        <div>
+          <p class="text-xs uppercase text-slate-400">Hoy</p>
+          <p id="todayLabel" class="text-lg font-semibold text-white"></p>
+        </div>
+      </div>
+    </header>
+
+    <section id="nextTaskCard" class="glass-card rounded-2xl p-4 mb-4 sticky top-3 z-30">
+      <div class="flex items-center justify-between gap-3">
+        <div class="flex items-center gap-3 min-w-0">
+          <div id="nextTaskEmoji" class="w-10 h-10 rounded-xl bg-accent/10 text-accent flex items-center justify-center text-xl">⏭</div>
+          <div class="min-w-0">
+            <p class="text-[11px] uppercase tracking-[0.18em] text-slate-400">Siguiente tarea</p>
+            <p id="nextTaskTitle" class="font-semibold text-base card-title truncate">Sin tareas para hoy</p>
+            <p id="nextTaskMeta" class="text-xs card-sub truncate">Crea una tarea y aparece aqui.</p>
+          </div>
+        </div>
+        <div class="text-right shrink-0">
+          <p class="text-[11px] uppercase tracking-[0.18em] text-slate-400">Cuenta regresiva</p>
+          <p id="nextTaskCountdown" class="font-semibold text-base card-title">--</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="glass-card rounded-3xl p-5 sm:p-6 shadow-glass relative overflow-hidden">
+      <div class="absolute inset-0 pointer-events-none opacity-40" aria-hidden="true">
+        <div class="absolute -left-32 top-10 w-72 h-72 bg-gradient-to-br from-accent/10 to-white/5 rounded-full blur-3xl"></div>
+        <div class="absolute right-0 -bottom-24 w-80 h-80 bg-gradient-to-tr from-highlight/10 to-white/5 rounded-full blur-3xl"></div>
+      </div>
+      <div class="relative flex items-center justify-between mb-4">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-2xl bg-accent/10 text-accent flex items-center justify-center text-xl">⏱️</div>
+          <div>
+            <h2 class="font-display text-xl font-semibold">Línea del tiempo</h2>
+          </div>
+        </div>
+        <div></div>
+      </div>
+
+      <div class="relative mb-4">
+        <div class="flex items-center justify-between text-sm text-slate-300 mb-2">
+          <span id="progressLabel">Progreso 0%</span>
+          <span id="progressCount" class="text-slate-400">0 / 0</span>
+        </div>
+        <div class="h-3 rounded-full bg-white/5 overflow-hidden">
+          <div id="progressBar" class="h-full w-0 bg-gradient-to-r from-accent to-highlight transition-all duration-300"></div>
+        </div>
+      </div>
+
+      <div class="mb-4 space-y-2">
+        <div class="flex items-center justify-between gap-2">
+          <p class="text-xs uppercase tracking-[0.2em] text-slate-400">Vista por grupos</p>
+          <div id="viewModeSwitch" class="view-toggle">
+            <button type="button" class="view-toggle-btn active" data-view-mode="time">Por hora</button>
+            <button type="button" class="view-toggle-btn" data-view-mode="group">Por grupo</button>
+          </div>
+        </div>
+        <div id="groupFilters" class="flex gap-2 overflow-x-auto pb-1 sm:flex-wrap sm:overflow-visible"></div>
+      </div>
+
+      <div class="relative overflow-x-hidden" id="timelineWrapper">
+        <div id="timeline" class="relative min-w-full pt-2 pb-2"></div>
+      </div>
+
+      <div class="mt-6 flex justify-center">
+        <button id="restoreDailyBtn" type="button" class="px-4 py-2 text-sm rounded-xl bg-red-700/90 text-white hover:bg-red-700">
+          Restaurar
+        </button>
+      </div>
+    </section>
+
+  </div>
+
+  <button id="fabAdd" class="fixed right-5 bottom-5 sm:right-8 sm:bottom-8 w-14 h-14 rounded-full bg-accent text-slate-900 text-3xl shadow-glow flex items-center justify-center hover:brightness-110">＋</button>
+
+  <div id="taskModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 hidden">
+    <div class="glass-strong w-full max-w-lg rounded-3xl p-6 relative shadow-glass">
+      <button id="closeForm" class="absolute top-3 right-3 text-slate-400 hover:text-white">✕</button>
+      <h3 class="font-display text-xl font-semibold mb-1">Nueva tarea</h3>
+      <p class="text-slate-400 text-sm mb-4">Define frecuencia, horario(s) y estilo. Todo queda guardado en tu navegador.</p>
+      <form id="taskForm" class="space-y-3">
+        <div class="grid grid-cols-4 gap-3">
+          <label class="col-span-3 text-sm text-slate-200">Título
+            <input name="title" required class="mt-1 w-full glass-card rounded-xl px-3 py-2 text-sm outline-none" placeholder="Ej. Beber agua" />
+          </label>
+          <label class="text-sm text-slate-200">Emoji
+            <input name="emoji" class="mt-1 w-full glass-card rounded-xl px-3 py-2 text-sm" placeholder="💧" maxlength="2" />
+          </label>
+        </div>
+        <div class="space-y-2">
+          <label class="text-sm text-slate-200 block">Grupo</label>
+          <div class="grid grid-cols-[1fr_auto] gap-2">
+            <select name="groupId" id="groupSelect" class="w-full glass-card rounded-xl px-3 py-2 text-sm"></select>
+            <a href="groups.html" class="pill px-3 py-2 text-sm text-slate-100">Gestionar</a>
+          </div>
+          <p id="groupColorHint" class="text-xs text-slate-400">Color del grupo se aplica automaticamente.</p>
+        </div>
+        <label class="text-sm text-slate-200 block">Tipo de frecuencia
+          <select name="type" class="mt-1 w-full glass-card rounded-xl px-3 py-2 text-sm">
+            <option value="daily">Diaria</option>
+            <option value="every-x-hours">Cada X horas</option>
+            <option value="weekdays">Días específicos</option>
+            <option value="specific-dates">Fechas específicas</option>
+            <option value="multi-times">Varias veces al día</option>
+          </select>
+        </label>
+        <div id="dynamicFields" class="space-y-3">
+          <div data-type="daily" class="freq-block">
+            <label class="text-sm text-slate-200 block">Hora
+              <input name="time" type="time" value="08:00" class="mt-1 w-full glass-card rounded-xl px-3 py-2 text-sm" />
+            </label>
+          </div>
+          <div data-type="every-x-hours" class="freq-block hidden">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <label class="text-sm text-slate-200 block">Desde
+                <input name="startTime" type="time" value="07:00" class="mt-1 w-full glass-card rounded-xl px-3 py-2 text-sm" />
+              </label>
+              <label class="text-sm text-slate-200 block">Cada (horas)
+                <input name="interval" type="number" min="1" value="3" class="mt-1 w-full glass-card rounded-xl px-3 py-2 text-sm" />
+              </label>
+            </div>
+          </div>
+          <div data-type="weekdays" class="freq-block hidden">
+            <p class="text-sm text-slate-200 mb-1">Días</p>
+            <div class="grid grid-cols-3 gap-2 text-xs text-slate-200">
+              <label class="pill px-3 py-2 flex items-center gap-2"><input type="checkbox" name="days" value="1" checked /> Lun</label>
+              <label class="pill px-3 py-2 flex items-center gap-2"><input type="checkbox" name="days" value="2" /> Mar</label>
+              <label class="pill px-3 py-2 flex items-center gap-2"><input type="checkbox" name="days" value="3" /> Mié</label>
+              <label class="pill px-3 py-2 flex items-center gap-2"><input type="checkbox" name="days" value="4" /> Jue</label>
+              <label class="pill px-3 py-2 flex items-center gap-2"><input type="checkbox" name="days" value="5" /> Vie</label>
+              <label class="pill px-3 py-2 flex items-center gap-2"><input type="checkbox" name="days" value="6" /> Sáb</label>
+              <label class="pill px-3 py-2 flex items-center gap-2"><input type="checkbox" name="days" value="0" /> Dom</label>
+            </div>
+            <label class="text-sm text-slate-200 block mt-2">Hora
+              <input name="weekdayTime" type="time" value="09:00" class="mt-1 w-full glass-card rounded-xl px-3 py-2 text-sm" />
+            </label>
+          </div>
+          <div data-type="specific-dates" class="freq-block hidden">
+            <label class="text-sm text-slate-200 block">Fechas
+              <input name="dates" type="text" placeholder="2026-03-10,2026-03-15" class="mt-1 w-full glass-card rounded-xl px-3 py-2 text-sm" />
+            </label>
+            <label class="text-sm text-slate-200 block">Hora
+              <input name="specificTime" type="time" value="10:00" class="mt-1 w-full glass-card rounded-xl px-3 py-2 text-sm" />
+            </label>
+          </div>
+          <div data-type="multi-times" class="freq-block hidden">
+            <p class="text-sm text-slate-200">Horas del día</p>
+            <div class="flex gap-2 flex-wrap" id="timesList"></div>
+            <div class="flex gap-2">
+              <input id="newTime" type="time" value="08:00" class="glass-card rounded-xl px-3 py-2 text-sm flex-1" />
+              <button type="button" id="addTime" class="pill px-3 py-2 text-sm hover:bg-white/15">Agregar</button>
+            </div>
+          </div>
+        </div>
+        <div class="flex items-center justify-end pt-2">
+          <button class="bg-accent text-slate-900 font-semibold px-4 py-2 rounded-xl shadow-glow hover:brightness-110">Guardar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="confirmModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-[60] hidden">
+    <div class="glass-strong w-full max-w-sm rounded-2xl p-5 border border-white/10">
+      <h4 id="confirmTitle" class="font-semibold text-lg card-title mb-1">Confirmar accion</h4>
+      <p id="confirmMessage" class="card-sub text-sm mb-4">Esta accion no se puede deshacer.</p>
+      <div class="flex justify-end gap-2">
+        <button id="confirmCancel" type="button" class="pill px-3 py-2 text-sm">Cancelar</button>
+        <button id="confirmOk" type="button" class="px-3 py-2 text-sm rounded-md bg-red-700/90 text-white">Eliminar</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="assets/js/index.js"></script>
+</body>
+</html>
+

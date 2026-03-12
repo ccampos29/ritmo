@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <!-- Generado por scripts/build-pages.sh -->
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#0a0f1d" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>Ritmo - Grupos</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="assets/css/groups.css" />
+</head>
+<body class="text-slate-100 antialiased">
+
+  <div class="floating-bg"></div>
+
+  <main class="relative max-w-5xl mx-auto px-4 pb-10 pt-10 sm:pt-14" style="padding-left:max(1rem,env(safe-area-inset-left));padding-right:max(1rem,env(safe-area-inset-right));">
+    <header class="flex items-center justify-between mb-4">
+      <div>
+        <p class="uppercase tracking-[0.3em] text-xs text-slate-400">Ritmo diario</p>
+        <h1 class="font-display text-2xl sm:text-3xl font-semibold">Gestion de grupos</h1>
+      </div>
+      <a href="index.html" class="pill px-3 py-2 text-sm">Volver</a>
+    </header>
+
+    <section class="glass-card rounded-2xl p-4 sm:p-5 mb-4">
+      <h2 class="text-lg font-semibold mb-1">Nuevo grupo</h2>
+      <p class="text-sm text-slate-400 mb-4">Los grupos se cargan automaticamente en el formulario de crear tarea.</p>
+      <form id="groupForm" class="grid grid-cols-1 sm:grid-cols-[1fr_120px_auto] gap-3">
+        <input id="groupName" required maxlength="24" class="w-full glass-card rounded-xl px-3 py-2" placeholder="Ej. Bienestar" />
+        <input id="groupColor" type="color" value="#7cf8d3" class="w-full h-11 rounded-xl border border-white/15 bg-transparent p-1" />
+        <div class="flex gap-2">
+          <button id="groupSave" class="px-4 py-2 rounded-xl bg-emerald-400 text-slate-900 font-semibold">Guardar</button>
+          <button id="groupCancel" type="button" class="px-4 py-2 rounded-xl pill hidden">Cancelar</button>
+        </div>
+      </form>
+      <p id="groupMsg" class="text-xs text-slate-400 mt-3"></p>
+    </section>
+
+    <section class="glass-card rounded-2xl p-4 sm:p-5">
+      <h2 class="text-lg font-semibold mb-3">Lista de grupos</h2>
+      <div id="groupsList" class="space-y-2"></div>
+    </section>
+  </main>
+
+  <div id="confirmModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-[60] hidden">
+    <div class="glass-strong w-full max-w-sm rounded-2xl p-5 border border-white/10">
+      <h4 id="confirmTitle" class="font-semibold text-lg mb-1">Confirmar accion</h4>
+      <p id="confirmMessage" class="text-sm text-slate-300 mb-4">Esta accion no se puede deshacer.</p>
+      <div class="flex justify-end gap-2">
+        <button id="confirmCancel" type="button" class="pill px-3 py-2 text-sm">Cancelar</button>
+        <button id="confirmOk" type="button" class="px-3 py-2 text-sm rounded-md bg-red-700/90 text-white">Eliminar</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="assets/js/groups.js"></script>
+</body>
+</html>
+
