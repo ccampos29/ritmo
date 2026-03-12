@@ -453,7 +453,7 @@
       row.dataset.id = summary.task.id;
 
       const actions = document.createElement('div');
-      actions.className = 'pl-2 swipe-actions';
+      actions.className = 'swipe-actions';
       actions.innerHTML = `
         <button class="swipe-minus" data-action="undo" data-id="${summary.task.id}" ${summary.doneCount > 0 ? '' : 'disabled'}>
           <span class="swipe-label">−</span>
