@@ -168,12 +168,20 @@
       visibility: hidden;
       transform: translateX(16px);
       transition: opacity 0.18s ease, transform 0.18s ease, visibility 0.18s ease;
-      z-index: 0;
+      z-index: 2;
     }
     .swiped .swipe-actions {
       opacity: 1;
       visibility: visible;
       transform: translateX(0);
+    }
+    @media (hover: hover) and (pointer: fine) {
+      .swipe-wrap:hover .swipe-actions,
+      .swipe-wrap:focus-within .swipe-actions {
+        opacity: 1;
+        visibility: visible;
+        transform: translateX(0);
+      }
     }
     .swipe-actions button {
       pointer-events: auto;
