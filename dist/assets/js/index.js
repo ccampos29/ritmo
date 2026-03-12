@@ -967,7 +967,8 @@
     document.addEventListener('gesturechange', (e) => e.preventDefault());
     document.addEventListener('gestureend', (e) => e.preventDefault());
     document.addEventListener('touchmove', (e) => {
-      if (typeof e.scale === 'number' && e.scale !== 1) e.preventDefault();
+      // Keep normal one-finger scrolling; block only pinch-like gestures.
+      if (e.touches && e.touches.length > 1) e.preventDefault();
     }, { passive: false });
 
     // Keep countdown live and handle day rollover.
