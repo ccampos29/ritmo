@@ -28,6 +28,11 @@
     const confirmCancel = document.getElementById('confirmCancel');
     const confirmOk = document.getElementById('confirmOk');
     const restoreDailyBtn = document.getElementById('restoreDailyBtn');
+    const themeToggle = document.getElementById('themeToggle');
+    const themeColorMeta = document.querySelector('meta[name="theme-color"]');
+    const THEME_STORAGE_KEY = 'ritmo_theme';
+    const DARK_THEME_COLOR = '#0a0f1d';
+    const LIGHT_THEME_COLOR = '#eef4ff';
 
     let groups = loadGroups();
     let tasks = loadTasks();
@@ -35,12 +40,14 @@
     let multiTimesBuffer = ['08:00', '12:00', '18:00'];
     let editingTaskId = null;
     let activeGroupFilter = loadStoredGroupFilter();
+    let activeTheme = loadStoredTheme();
     let viewMode = loadStoredViewMode();
     const VIRTUAL_ROW_HEIGHT = 100;
     const VIRTUAL_OVERSCAN = 8;
     const ALLOWED_FREQUENCIES = ['daily', 'every-x-hours', 'multi-times'];
     const TIME_CHIP_RED_THRESHOLD_MIN = 30;
     const TIME_CHIP_YELLOW_THRESHOLD_MIN = 120;
+    const systemThemeQuery = window.matchMedia ? window.matchMedia('(prefers-color-scheme: light)') : null;
     let virtualModel = null;
     let virtualRaf = null;
     let virtualListenersBound = false;
@@ -48,6 +55,80 @@
 
     function formatDateLabel(date = new Date()) {
       return date.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
+    }
+
+    function loadStoredTheme() {
+      try {
+        const stored = localStorage.getItem(THEME_STORAGE_KEY);
+        if (stored === 'light' || stored === 'dark') return stored;
+      } catch (e) {
+        // no-op
+      }
+      if (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) return 'light';
+      return 'dark';
+    }
+
+    function hasPersistedTheme() {
+      try {
+        const stored = localStorage.getItem(THEME_STORAGE_KEY);
+        return stored === 'light' || stored === 'dark';
+      } catch (e) {
+        return false;
+      }
+    }
+
+    function saveStoredTheme() {
+      try {
+        localStorage.setItem(THEME_STORAGE_KEY, activeTheme);
+      } catch (e) {
+        // no-op
+      }
+    }
+
+    function renderThemeToggle() {
+      if (!themeToggle) return;
+      const isLight = activeTheme === 'light';
+      const nextLabel = isLight ? 'Oscuro' : 'Claro';
+      const icon = isLight ? '🌙' : '☀️';
+      const title = isLight ? 'Cambiar a tema oscuro' : 'Cambiar a tema claro';
+      themeToggle.dataset.theme = activeTheme;
+      themeToggle.setAttribute('aria-label', title);
+      themeToggle.setAttribute('title', title);
+      themeToggle.innerHTML = `<span class="theme-toggle-icon" aria-hidden="true">${icon}</span><span class="theme-toggle-label">${nextLabel}</span>`;
+    }
+
+    function applyTheme(theme, options = {}) {
+      const { persist = false } = options;
+      activeTheme = theme === 'light' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', activeTheme);
+      if (themeColorMeta) {
+        themeColorMeta.setAttribute('content', activeTheme === 'light' ? LIGHT_THEME_COLOR : DARK_THEME_COLOR);
+      }
+      if (persist) saveStoredTheme();
+      renderThemeToggle();
+    }
+
+    function initTheme() {
+      applyTheme(activeTheme);
+
+      if (themeToggle) {
+        themeToggle.addEventListener('click', () => {
+          applyTheme(activeTheme === 'dark' ? 'light' : 'dark', { persist: true });
+        });
+      }
+
+      if (!systemThemeQuery) return;
+
+      const onSystemThemeChange = (event) => {
+        if (hasPersistedTheme()) return;
+        applyTheme(event.matches ? 'light' : 'dark');
+      };
+
+      if (typeof systemThemeQuery.addEventListener === 'function') {
+        systemThemeQuery.addEventListener('change', onSystemThemeChange);
+      } else if (typeof systemThemeQuery.addListener === 'function') {
+        systemThemeQuery.addListener(onSystemThemeChange);
+      }
     }
 
     function loadStoredViewMode() {
@@ -214,6 +295,41 @@
     function resolveTaskColor(task) {
       const group = resolveGroupByTask(task);
       return group ? group.color : (task.color || '#7cf8d3');
+    }
+
+    function hexToRgb(hex) {
+      const normalized = (hex || '').trim().replace('#', '');
+      if (/^[\da-fA-F]{3}$/.test(normalized)) {
+        return {
+          r: parseInt(normalized[0] + normalized[0], 16),
+          g: parseInt(normalized[1] + normalized[1], 16),
+          b: parseInt(normalized[2] + normalized[2], 16)
+        };
+      }
+      if (/^[\da-fA-F]{6}$/.test(normalized)) {
+        return {
+          r: parseInt(normalized.slice(0, 2), 16),
+          g: parseInt(normalized.slice(2, 4), 16),
+          b: parseInt(normalized.slice(4, 6), 16)
+        };
+      }
+      return null;
+    }
+
+    function colorToRgba(color, alpha = 1) {
+      const safeAlpha = Math.min(1, Math.max(0, alpha));
+      const hexRgb = hexToRgb(color);
+      if (hexRgb) {
+        return `rgba(${hexRgb.r}, ${hexRgb.g}, ${hexRgb.b}, ${safeAlpha})`;
+      }
+      const rgbMatch = String(color || '').match(/rgba?\(([^)]+)\)/i);
+      if (rgbMatch) {
+        const parts = rgbMatch[1].split(',').map(part => Number.parseFloat(part.trim())).slice(0, 3);
+        if (parts.length === 3 && parts.every(Number.isFinite)) {
+          return `rgba(${parts[0]}, ${parts[1]}, ${parts[2]}, ${safeAlpha})`;
+        }
+      }
+      return `rgba(143, 244, 216, ${safeAlpha})`;
     }
 
     function resolveTaskGroupMeta(task) {
@@ -389,9 +505,15 @@
       const pending = occurrences.filter(entry => !doneMap[occurrenceKey(entry.task.id, entry.time)]);
       if (pending.length === 0) {
         nextTaskEmoji.textContent = '✅';
-        nextTaskEmoji.style.background = 'rgba(45, 212, 191, 0.2)';
-        nextTaskEmoji.style.borderColor = 'rgba(45, 212, 191, 0.46)';
-        nextTaskEmoji.style.color = '#8ff4d8';
+        if (activeTheme === 'light') {
+          nextTaskEmoji.style.background = 'rgba(16, 185, 129, 0.2)';
+          nextTaskEmoji.style.borderColor = 'rgba(5, 150, 105, 0.38)';
+          nextTaskEmoji.style.color = '#047857';
+        } else {
+          nextTaskEmoji.style.background = 'rgba(45, 212, 191, 0.2)';
+          nextTaskEmoji.style.borderColor = 'rgba(45, 212, 191, 0.46)';
+          nextTaskEmoji.style.color = '#8ff4d8';
+        }
         nextTaskTitle.textContent = 'Todo completado por hoy';
         nextTaskMeta.textContent = 'Buen ritmo. No hay pendientes.';
         setCountdownState('0 pendientes', 'ok');
@@ -521,6 +643,12 @@
       card.className = `card-bg task-progress ${animate ? 'animate-progress' : ''} px-3.5 py-2.5 flex items-center gap-3 transition card-inner ${sizeClass}`;
       card.style.borderLeft = `4px solid ${taskColor}`;
       card.style.setProperty('--task-progress', `${progressPct}%`);
+      const strongBase = activeTheme === 'light' ? 0.34 : 0.26;
+      const strongCap = activeTheme === 'light' ? 0.78 : 0.66;
+      const strongAlpha = Math.min(strongCap, strongBase + (progressPct / 100) * 0.34);
+      const softAlpha = Math.max(0.12, strongAlpha - (activeTheme === 'light' ? 0.28 : 0.2));
+      card.style.setProperty('--task-progress-color-strong', colorToRgba(taskColor, strongAlpha));
+      card.style.setProperty('--task-progress-color-soft', colorToRgba(taskColor, softAlpha));
       if (animate) {
         const delaySeed = virtual ? (index % 8) : index;
         card.style.setProperty('--progress-delay', `${Math.min(delaySeed * 22 + 40, 220)}ms`);
@@ -568,6 +696,7 @@
         });
 
         const container = document.createElement('section');
+        container.className = 'mb-4';
 
         const header = document.createElement('div');
         header.className = 'flex items-center justify-between border border-white/10 px-3 py-2 rounded-xl bg-white/5';
@@ -994,6 +1123,7 @@
 
 
     // init
+    initTheme();
     renderGroupOptions('');
 
     renderTimesChips();

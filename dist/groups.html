@@ -8,6 +8,23 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <title>Ritmo - Grupos</title>
+  <script>
+    (function () {
+      var storageKey = 'ritmo_theme';
+      var theme = 'dark';
+      try {
+        var stored = localStorage.getItem(storageKey);
+        if (stored === 'light' || stored === 'dark') {
+          theme = stored;
+        } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) {
+          theme = 'light';
+        }
+      } catch (e) {
+        theme = 'dark';
+      }
+      document.documentElement.setAttribute('data-theme', theme);
+    })();
+  </script>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="assets/css/groups.css" />
 </head>
@@ -21,7 +38,13 @@
         <p class="uppercase tracking-[0.3em] text-xs text-slate-400">Ritmo diario</p>
         <h1 class="font-display text-2xl sm:text-3xl font-semibold">Gestion de grupos</h1>
       </div>
-      <a href="index.html" class="pill px-3 py-2 text-sm">Volver</a>
+      <div class="flex items-center gap-2">
+        <a href="index.html" class="pill px-3 py-2 text-sm">Volver</a>
+        <button id="themeToggle" type="button" class="theme-toggle pill inline-flex px-3 py-2 text-sm text-slate-100" aria-label="Cambiar tema">
+          <span class="theme-toggle-icon" aria-hidden="true">☀️</span>
+          <span class="theme-toggle-label">Claro</span>
+        </button>
+      </div>
     </header>
 
     <section class="glass-card rounded-2xl p-4 sm:p-5 mb-4">
@@ -58,4 +81,3 @@
   <script src="assets/js/groups.js"></script>
 </body>
 </html>
-

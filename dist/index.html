@@ -8,6 +8,23 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <title>Ritmo — Planificador en línea de tiempo</title>
+  <script>
+    (function () {
+      var storageKey = 'ritmo_theme';
+      var theme = 'dark';
+      try {
+        var stored = localStorage.getItem(storageKey);
+        if (stored === 'light' || stored === 'dark') {
+          theme = stored;
+        } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) {
+          theme = 'light';
+        }
+      } catch (e) {
+        theme = 'dark';
+      }
+      document.documentElement.setAttribute('data-theme', theme);
+    })();
+  </script>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="assets/js/tailwind.index.config.js"></script>
   <link rel="stylesheet" href="assets/css/index.css" />
@@ -23,8 +40,12 @@
         <h1 class="font-display text-3xl sm:text-4xl font-semibold flex items-center gap-2">
           Tu línea del día
         </h1>
-        <div class="mt-2">
+        <div class="mt-2 flex flex-wrap items-center gap-2">
           <a href="groups.html" class="pill inline-flex px-3 py-2 text-sm text-slate-100">Grupos</a>
+          <button id="themeToggle" type="button" class="theme-toggle pill inline-flex px-3 py-2 text-sm text-slate-100" aria-label="Cambiar tema">
+            <span class="theme-toggle-icon" aria-hidden="true">☀️</span>
+            <span class="theme-toggle-label">Claro</span>
+          </button>
         </div>
       </div>
       <div class="glass-card rounded-2xl px-4 py-3 flex items-center gap-3 shadow-glass">
