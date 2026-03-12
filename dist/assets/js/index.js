@@ -438,12 +438,17 @@
     }
 
     function buildTimelineRow(summary, options = {}) {
-      const { virtual = false, index = 0 } = options;
+      const { virtual = false, index = 0, animate = true } = options;
       const row = document.createElement('div');
       row.className = virtual ? 'absolute left-0 right-0 swipe-wrap' : 'relative swipe-wrap';
       if (virtual) {
         row.style.top = `${index * VIRTUAL_ROW_HEIGHT}px`;
         row.style.height = `${VIRTUAL_ROW_HEIGHT}px`;
+      }
+      if (animate) {
+        const delaySeed = virtual ? (index % 8) : index;
+        row.classList.add('timeline-enter');
+        row.style.setProperty('--enter-delay', `${Math.min(delaySeed * 22, 154)}ms`);
       }
       row.dataset.id = summary.task.id;
 
@@ -451,7 +456,7 @@
       actions.className = 'pl-2 swipe-actions';
       actions.innerHTML = `
         <button class="swipe-minus" data-action="undo" data-id="${summary.task.id}" ${summary.doneCount > 0 ? '' : 'disabled'}>
-          <span class="swipe-label">−1</span>
+          <span class="swipe-label">−</span>
         </button>
         <button class="swipe-edit" data-action="edit" data-id="${summary.task.id}">
           <span class="swipe-label">Editar</span>
@@ -469,9 +474,13 @@
       const progressPct = summary.total ? Math.round((summary.doneCount / summary.total) * 100) : 0;
       const timeTag = summary.displayTime || '--:--';
       const sizeClass = virtual ? 'h-full' : 'min-h-[86px]';
-      card.className = `glass-strong card-bg task-progress rounded-none px-4 py-3 border border-white/10 flex items-center gap-3 hover:border-white/30 transition card-inner ${sizeClass}`;
+      card.className = `glass-strong card-bg task-progress ${animate ? 'animate-progress' : ''} rounded-none px-4 py-3 border border-white/10 flex items-center gap-3 hover:border-white/30 transition card-inner ${sizeClass}`;
       card.style.borderLeft = `6px solid ${taskColor}`;
       card.style.setProperty('--task-progress', `${progressPct}%`);
+      if (animate) {
+        const delaySeed = virtual ? (index % 8) : index;
+        card.style.setProperty('--progress-delay', `${Math.min(delaySeed * 22 + 40, 220)}ms`);
+      }
       card.innerHTML = `
         <button class="check-btn ${fullyDone ? 'checked' : ''}" data-action="done" data-id="${summary.task.id}">${fullyDone ? '✔' : ''}</button>
         <div class="avatar w-10 h-10 rounded-xl flex items-center justify-center text-xl" style="background:${taskColor}22; color:${taskColor}">${summary.task.emoji || '•'}</div>
@@ -525,8 +534,8 @@
 
         const listEl = document.createElement('div');
         listEl.className = 'space-y-0';
-        section.items.forEach(summary => {
-          listEl.appendChild(buildTimelineRow(summary));
+        section.items.forEach((summary, idx) => {
+          listEl.appendChild(buildTimelineRow(summary, { index: idx, animate: true }));
         });
         container.appendChild(listEl);
         frag.appendChild(container);

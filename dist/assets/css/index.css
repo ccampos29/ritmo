@@ -95,11 +95,36 @@
     .card-sub { color: var(--muted); }
     .time-label { color: var(--muted); font-weight: 600; letter-spacing: 0.08em; }
     .card-bg { background: transparent; }
+    .timeline-enter {
+      opacity: 0;
+      transform: translateY(8px);
+      animation: timelineFadeIn 0.28s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+      animation-delay: var(--enter-delay, 0ms);
+    }
     .task-progress {
       --task-progress: 0%;
-      background:
-        linear-gradient(90deg, rgba(143, 244, 216, 0.18) 0 var(--task-progress), transparent var(--task-progress) 100%),
-        var(--card-strong);
+      --progress-delay: 0ms;
+      position: relative;
+      overflow: hidden;
+      background: var(--card-strong);
+    }
+    .task-progress::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      width: var(--task-progress);
+      background: linear-gradient(90deg, rgba(143, 244, 216, 0.24), rgba(143, 244, 216, 0.12));
+      transition: width 0.32s cubic-bezier(0.2, 0.8, 0.2, 1);
+      z-index: 0;
+    }
+    .task-progress.animate-progress::before {
+      width: 0;
+      animation: progressFillIn 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+      animation-delay: var(--progress-delay, 0ms);
+    }
+    .task-progress > * {
+      position: relative;
+      z-index: 1;
     }
     .check-btn {
       width: 36px; height: 36px;
@@ -108,13 +133,15 @@
       display: inline-flex; align-items: center; justify-content: center;
       background: rgba(255,255,255,0.07);
       color: var(--text);
-      transition: all 0.15s ease;
+      transition: all 0.15s ease, transform 0.14s ease;
     }
+    .check-btn:active { transform: scale(0.9); }
     .check-btn:hover { border-color: var(--accent); color: var(--accent); }
     .check-btn.checked {
       background: var(--accent);
       border-color: var(--accent);
       color: #0b0f1d;
+      animation: checkPop 0.24s ease;
     }
     .floating-bg {
       position: fixed;
@@ -253,4 +280,32 @@
     }
     #taskForm .grid > label {
       min-width: 0;
+    }
+    @keyframes timelineFadeIn {
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+    @keyframes progressFillIn {
+      to {
+        width: var(--task-progress);
+      }
+    }
+    @keyframes checkPop {
+      0% { transform: scale(0.84); }
+      70% { transform: scale(1.08); }
+      100% { transform: scale(1); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .timeline-enter,
+      .task-progress.animate-progress::before,
+      .check-btn.checked {
+        animation: none !important;
+      }
+      .task-progress::before,
+      .card-inner,
+      .check-btn {
+        transition: none !important;
+      }
     }
