@@ -299,6 +299,53 @@
       return list.sort((a, b) => a.time.localeCompare(b.time));
     }
 
+    function resolveTaskDisplayTime(task, pendingTimes, allTimes, now = new Date()) {
+      if (pendingTimes.length > 0) {
+        const upcoming = pendingTimes.find(time => timeToDate(time, now) >= now);
+        if (upcoming) return { time: upcoming, hasPending: true, overdue: false };
+        return { time: pendingTimes[0], hasPending: true, overdue: true };
+      }
+      const upcomingAny = allTimes.find(time => timeToDate(time, now) >= now);
+      return { time: upcomingAny || allTimes[allTimes.length - 1] || null, hasPending: false, overdue: false };
+    }
+
+    function buildTaskSummaries(entries, doneMap, now = new Date()) {
+      const grouped = new Map();
+      entries.forEach(entry => {
+        const key = entry.task.id;
+        if (!grouped.has(key)) grouped.set(key, { task: entry.task, times: [] });
+        grouped.get(key).times.push(entry.time);
+      });
+
+      const summaries = [];
+      grouped.forEach((value) => {
+        const times = [...value.times].sort((a, b) => a.localeCompare(b));
+        const doneCount = times.reduce((count, time) => {
+          return count + (doneMap[occurrenceKey(value.task.id, time)] ? 1 : 0);
+        }, 0);
+        const pendingTimes = times.filter(time => !doneMap[occurrenceKey(value.task.id, time)]);
+        const display = resolveTaskDisplayTime(value.task, pendingTimes, times, now);
+        summaries.push({
+          task: value.task,
+          times,
+          total: times.length,
+          doneCount,
+          displayTime: display.time,
+          hasPending: display.hasPending,
+          overdue: display.overdue
+        });
+      });
+
+      summaries.sort((a, b) => {
+        if (a.hasPending !== b.hasPending) return a.hasPending ? -1 : 1;
+        if (a.overdue !== b.overdue) return a.overdue ? -1 : 1;
+        if (a.displayTime !== b.displayTime) return (a.displayTime || '').localeCompare(b.displayTime || '');
+        return (a.task.title || '').localeCompare(b.task.title || '');
+      });
+
+      return summaries;
+    }
+
     function timeToDate(time, date = new Date()) {
       const [h, m] = time.split(':').map(Number);
       const target = new Date(date);
@@ -390,7 +437,7 @@
       });
     }
 
-    function buildTimelineRow(entry, done, options = {}) {
+    function buildTimelineRow(summary, options = {}) {
       const { virtual = false, index = 0 } = options;
       const row = document.createElement('div');
       row.className = virtual ? 'absolute left-0 right-0 swipe-wrap' : 'relative swipe-wrap';
@@ -398,33 +445,41 @@
         row.style.top = `${index * VIRTUAL_ROW_HEIGHT}px`;
         row.style.height = `${VIRTUAL_ROW_HEIGHT}px`;
       }
-      row.dataset.id = entry.task.id;
-      row.dataset.time = entry.time;
+      row.dataset.id = summary.task.id;
 
       const actions = document.createElement('div');
       actions.className = 'pl-2 swipe-actions';
       actions.innerHTML = `
-        <button class="swipe-edit" data-action="edit" data-id="${entry.task.id}">
+        <button class="swipe-minus" data-action="undo" data-id="${summary.task.id}" ${summary.doneCount > 0 ? '' : 'disabled'}>
+          <span class="swipe-label">−</span>
+        </button>
+        <button class="swipe-edit" data-action="edit" data-id="${summary.task.id}">
           <span class="swipe-label">Editar</span>
         </button>
-        <button class="swipe-delete" data-action="delete" data-id="${entry.task.id}">
+        <button class="swipe-delete" data-action="delete" data-id="${summary.task.id}">
           <span class="swipe-label">Eliminar</span>
         </button>
       `;
       row.appendChild(actions);
 
       const card = document.createElement('article');
-      const taskColor = resolveTaskColor(entry.task);
-      const taskGroup = resolveTaskGroup(entry.task);
+      const taskColor = resolveTaskColor(summary.task);
+      const taskGroup = resolveTaskGroup(summary.task);
+      const fullyDone = summary.total > 0 && summary.doneCount >= summary.total;
+      const progressPct = summary.total ? Math.round((summary.doneCount / summary.total) * 100) : 0;
+      const timeTag = summary.displayTime || '--:--';
       const sizeClass = virtual ? 'h-full' : 'min-h-[86px]';
-      card.className = `glass-strong card-bg rounded-none px-4 py-3 border border-white/10 flex items-center gap-3 hover:border-white/30 transition card-inner ${sizeClass} ${done ? 'done-card collapsed-card' : ''}`;
+      card.className = `glass-strong card-bg task-progress rounded-none px-4 py-3 border border-white/10 flex items-center gap-3 hover:border-white/30 transition card-inner ${sizeClass}`;
       card.style.borderLeft = `6px solid ${taskColor}`;
+      card.style.setProperty('--task-progress', `${progressPct}%`);
       card.innerHTML = `
-        <button class="check-btn ${done ? 'checked' : ''}" data-action="done" data-id="${entry.task.id}" data-time="${entry.time}">${done ? '✔' : ''}</button>
-        <div class="avatar w-10 h-10 rounded-xl flex items-center justify-center text-xl" style="background:${taskColor}22; color:${taskColor}">${entry.task.emoji || '•'}</div>
+        <button class="check-btn ${fullyDone ? 'checked' : ''}" data-action="done" data-id="${summary.task.id}">${fullyDone ? '✔' : ''}</button>
+        <div class="avatar w-10 h-10 rounded-xl flex items-center justify-center text-xl" style="background:${taskColor}22; color:${taskColor}">${summary.task.emoji || '•'}</div>
         <div class="flex-1 card-main">
-          <p class="text-xs uppercase tracking-[0.2em] time-label">${entry.time}</p>
-          <p class="font-semibold text-base card-title">${entry.task.title}</p>
+          <div class="flex items-center gap-2 min-w-0">
+            <p class="font-semibold text-base card-title truncate flex-1">${summary.task.title}</p>
+            <span class="pill shrink-0 px-2 py-1 text-[11px] uppercase tracking-[0.12em] text-slate-200">${timeTag}</span>
+          </div>
           <p class="card-sub text-xs">${taskGroup}</p>
         </div>
       `;
@@ -432,23 +487,27 @@
       return row;
     }
 
-    function renderGroupedTimeline(entries, doneMap) {
+    function renderGroupedTimeline(summaries) {
       clearVirtualTimeline();
-      if (entries.length === 0) return;
+      if (summaries.length === 0) return;
 
       const grouped = new Map();
-      entries.forEach(entry => {
-        const meta = resolveTaskGroupMeta(entry.task);
+      summaries.forEach(summary => {
+        const meta = resolveTaskGroupMeta(summary.task);
         const key = meta.id || meta.name;
         if (!grouped.has(key)) grouped.set(key, { meta, items: [] });
-        grouped.get(key).items.push(entry);
+        grouped.get(key).items.push(summary);
       });
 
       const sections = [...grouped.values()].sort((a, b) => a.meta.name.localeCompare(b.meta.name));
       const frag = document.createDocumentFragment();
 
       sections.forEach(section => {
-        section.items.sort((a, b) => a.time.localeCompare(b.time));
+        section.items.sort((a, b) => {
+          if (a.hasPending !== b.hasPending) return a.hasPending ? -1 : 1;
+          if (a.overdue !== b.overdue) return a.overdue ? -1 : 1;
+          return (a.displayTime || '').localeCompare(b.displayTime || '');
+        });
 
         const container = document.createElement('section');
         container.className = 'mb-3';
@@ -466,9 +525,8 @@
 
         const listEl = document.createElement('div');
         listEl.className = 'space-y-0';
-        section.items.forEach(entry => {
-          const done = !!doneMap[occurrenceKey(entry.task.id, entry.time)];
-          listEl.appendChild(buildTimelineRow(entry, done));
+        section.items.forEach(summary => {
+          listEl.appendChild(buildTimelineRow(summary));
         });
         container.appendChild(listEl);
         frag.appendChild(container);
@@ -479,8 +537,8 @@
 
     function renderVirtualWindow() {
       if (!virtualModel) return;
-      const { entries, doneMap } = virtualModel;
-      const totalHeight = entries.length * VIRTUAL_ROW_HEIGHT;
+      const { summaries } = virtualModel;
+      const totalHeight = summaries.length * VIRTUAL_ROW_HEIGHT;
       timeline.style.height = `${totalHeight}px`;
 
       const wrapperRect = timelineWrapper.getBoundingClientRect();
@@ -491,18 +549,17 @@
       let start = Math.floor((viewTop - listTop) / VIRTUAL_ROW_HEIGHT) - VIRTUAL_OVERSCAN;
       let end = Math.ceil((viewBottom - listTop) / VIRTUAL_ROW_HEIGHT) + VIRTUAL_OVERSCAN;
       start = Math.max(0, start);
-      end = Math.min(entries.length - 1, end);
+      end = Math.min(summaries.length - 1, end);
 
-      if (entries.length === 0 || end < start) {
+      if (summaries.length === 0 || end < start) {
         timeline.innerHTML = '';
         return;
       }
 
       const frag = document.createDocumentFragment();
       for (let i = start; i <= end; i++) {
-        const entry = entries[i];
-        const done = !!doneMap[occurrenceKey(entry.task.id, entry.time)];
-        frag.appendChild(buildTimelineRow(entry, done, { virtual: true, index: i }));
+        const summary = summaries[i];
+        frag.appendChild(buildTimelineRow(summary, { virtual: true, index: i }));
       }
 
       timeline.innerHTML = '';
@@ -525,8 +582,8 @@
       window.addEventListener('resize', scheduleVirtualRender);
     }
 
-    function mountVirtualTimeline(entries, doneMap) {
-      virtualModel = { entries, doneMap };
+    function mountVirtualTimeline(summaries) {
+      virtualModel = { summaries };
       bindVirtualListeners();
       renderVirtualWindow();
     }
@@ -546,6 +603,7 @@
       const sorted = filterOccurrencesByGroup(collectTodayOccurrences()).sort((a, b) => a.time.localeCompare(b.time));
       const total = sorted.length;
       const doneMap = completions[todayKey] || {};
+      const taskSummaries = buildTaskSummaries(sorted, doneMap);
       const completed = sorted.reduce((count, entry) => {
         return count + (doneMap[occurrenceKey(entry.task.id, entry.time)] ? 1 : 0);
       }, 0);
@@ -563,7 +621,7 @@
         return;
       }
 
-      if (sorted.length === 0) {
+      if (taskSummaries.length === 0) {
         clearVirtualTimeline();
         const noToday = document.createElement('div');
         noToday.className = 'glass-card rounded-2xl p-5 text-slate-200';
@@ -582,9 +640,9 @@
       }
 
       if (viewMode === 'group') {
-        renderGroupedTimeline(sorted, doneMap);
+        renderGroupedTimeline(taskSummaries);
       } else {
-        mountVirtualTimeline(sorted, doneMap);
+        mountVirtualTimeline(taskSummaries);
       }
       updateProgress(completed, total);
       renderNextTaskCard(sorted, doneMap);
@@ -741,6 +799,8 @@
       const time = btn.dataset.time;
       if (action === 'done') {
         toggleDone(id, time);
+      } else if (action === 'undo') {
+        undoDone(id);
       } else if (action === 'edit') {
         openEdit(id);
       } else if (action === 'delete') {
@@ -787,8 +847,37 @@
     function toggleDone(id, time) {
       const day = todayISO();
       completions[day] = completions[day] || {};
-      const key = occurrenceKey(id, time);
-      completions[day][key] = !completions[day][key];
+      const dayMap = completions[day];
+      const task = tasks.find(item => item.id === id);
+      if (!task) return;
+      const times = getOccurrencesForToday(task).sort((a, b) => a.localeCompare(b));
+      if (times.length === 0) return;
+
+      if (time) {
+        const key = occurrenceKey(id, time);
+        dayMap[key] = !dayMap[key];
+      } else {
+        const now = new Date();
+        const pendingTimes = times.filter(taskTime => !dayMap[occurrenceKey(id, taskTime)]);
+        if (pendingTimes.length === 0) return;
+        const upcoming = pendingTimes.find(taskTime => timeToDate(taskTime, now) >= now);
+        const nextPending = upcoming || pendingTimes[0];
+        dayMap[occurrenceKey(id, nextPending)] = true;
+      }
+      saveCompletions();
+      renderTimeline();
+    }
+
+    function undoDone(id) {
+      const day = todayISO();
+      const dayMap = completions[day];
+      if (!dayMap) return;
+      const task = tasks.find(item => item.id === id);
+      if (!task) return;
+      const times = getOccurrencesForToday(task).sort((a, b) => a.localeCompare(b));
+      const lastDone = [...times].reverse().find(taskTime => dayMap[occurrenceKey(id, taskTime)]);
+      if (!lastDone) return;
+      delete dayMap[occurrenceKey(id, lastDone)];
       saveCompletions();
       renderTimeline();
     }

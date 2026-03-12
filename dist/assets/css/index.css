@@ -95,6 +95,12 @@
     .card-sub { color: var(--muted); }
     .time-label { color: var(--muted); font-weight: 600; letter-spacing: 0.08em; }
     .card-bg { background: transparent; }
+    .task-progress {
+      --task-progress: 0%;
+      background:
+        linear-gradient(90deg, rgba(143, 244, 216, 0.18) 0 var(--task-progress), transparent var(--task-progress) 100%),
+        var(--card-strong);
+    }
     .check-btn {
       width: 36px; height: 36px;
       border-radius: 9999px;
@@ -121,7 +127,7 @@
       opacity: 0.75;
     }
     .swipe-wrap {
-      --swipe-width: 176px;
+      --swipe-width: 264px;
       position: relative;
       overflow: hidden;
     }
@@ -132,7 +138,7 @@
       bottom: 0;
       width: var(--swipe-width);
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: 1fr 1fr 1fr;
       border-radius: 0;
       overflow: hidden;
       pointer-events: none;
@@ -156,8 +162,17 @@
       letter-spacing: 0.02em;
       transition: filter 0.18s ease;
     }
+    .swipe-actions button:disabled {
+      cursor: not-allowed;
+      opacity: 0.4;
+      filter: none;
+      pointer-events: none;
+    }
     .swipe-actions button:hover {
       filter: brightness(1.08);
+    }
+    .swipe-minus {
+      background: rgba(51, 65, 85, 0.9);
     }
     .swipe-edit {
       background: rgba(71, 85, 105, 0.9);
