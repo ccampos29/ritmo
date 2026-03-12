@@ -36,8 +36,11 @@
     let editingTaskId = null;
     let activeGroupFilter = loadStoredGroupFilter();
     let viewMode = loadStoredViewMode();
-    const VIRTUAL_ROW_HEIGHT = 96;
+    const VIRTUAL_ROW_HEIGHT = 100;
     const VIRTUAL_OVERSCAN = 8;
+    const ALLOWED_FREQUENCIES = ['daily', 'every-x-hours', 'multi-times'];
+    const TIME_CHIP_RED_THRESHOLD_MIN = 30;
+    const TIME_CHIP_YELLOW_THRESHOLD_MIN = 120;
     let virtualModel = null;
     let virtualRaf = null;
     let virtualListenersBound = false;
@@ -162,16 +165,13 @@
           groupId: 'morning',
           color: '#ffa8c5',
           group: 'Mañanas',
-          type: 'weekdays',
-          days: [1,2,3,4,5],
-          weekdayTime: '06:40'
+          type: 'daily',
+          time: '06:40'
         }
       ];
     }
 
     function getOccurrencesForToday(task, date = new Date()) {
-      const day = date.getDay();
-      const todayStr = date.toISOString().slice(0,10);
       switch (task.type) {
         case 'daily':
           return [task.time || '09:00'];
@@ -186,14 +186,6 @@
             current = new Date(current.getTime() + task.interval * 60 * 60 * 1000);
           }
           return times;
-        }
-        case 'weekdays': {
-          if (!task.days || !task.days.includes(day)) return [];
-          return [task.weekdayTime || '09:00'];
-        }
-        case 'specific-dates': {
-          const list = (task.dates || []).map(d => d.slice(0,10));
-          return list.includes(todayStr) ? [task.specificTime || '10:00'] : [];
         }
         case 'multi-times':
           return task.times || [];
@@ -369,21 +361,40 @@
       const source = entries || filterOccurrencesByGroup(collectTodayOccurrences());
       const occurrences = [...source].sort((a, b) => a.time.localeCompare(b.time));
       const doneMap = doneMapInput || completions[todayKey] || {};
+      const countdownStates = ['next-task-countdown-chip--ok', 'next-task-countdown-chip--warn', 'next-task-countdown-chip--hot'];
+
+      function setCountdownState(text, state = null) {
+        nextTaskCountdown.textContent = text;
+        nextTaskCountdown.classList.remove(...countdownStates);
+        if (state === 'ok') nextTaskCountdown.classList.add('next-task-countdown-chip--ok');
+        if (state === 'warn') nextTaskCountdown.classList.add('next-task-countdown-chip--warn');
+        if (state === 'hot') nextTaskCountdown.classList.add('next-task-countdown-chip--hot');
+      }
+
+      function resetNextTaskBadge() {
+        nextTaskEmoji.style.background = '';
+        nextTaskEmoji.style.borderColor = '';
+        nextTaskEmoji.style.color = '';
+      }
 
       if (occurrences.length === 0) {
         nextTaskEmoji.textContent = '⏭';
+        resetNextTaskBadge();
         nextTaskTitle.textContent = 'Sin tareas para hoy';
         nextTaskMeta.textContent = 'Crea una tarea y aparece aqui.';
-        nextTaskCountdown.textContent = '--';
+        setCountdownState('--');
         return;
       }
 
       const pending = occurrences.filter(entry => !doneMap[occurrenceKey(entry.task.id, entry.time)]);
       if (pending.length === 0) {
         nextTaskEmoji.textContent = '✅';
+        nextTaskEmoji.style.background = 'rgba(45, 212, 191, 0.2)';
+        nextTaskEmoji.style.borderColor = 'rgba(45, 212, 191, 0.46)';
+        nextTaskEmoji.style.color = '#8ff4d8';
         nextTaskTitle.textContent = 'Todo completado por hoy';
         nextTaskMeta.textContent = 'Buen ritmo. No hay pendientes.';
-        nextTaskCountdown.textContent = '0 pendientes';
+        setCountdownState('0 pendientes', 'ok');
         return;
       }
 
@@ -396,17 +407,28 @@
 
       const targetDate = timeToDate(target.time, now);
       const diff = targetDate.getTime() - now.getTime();
+      const diffMin = diff / 60000;
       const emoji = target.task.emoji?.trim() || '•';
       const group = resolveTaskGroup(target.task);
+      const taskColor = resolveTaskColor(target.task);
 
       nextTaskEmoji.textContent = emoji;
+      nextTaskEmoji.style.background = `${taskColor}1f`;
+      nextTaskEmoji.style.borderColor = `${taskColor}55`;
+      nextTaskEmoji.style.color = taskColor;
       nextTaskTitle.textContent = target.task.title;
       if (overdue) {
         nextTaskMeta.textContent = `${group} · pendiente desde ${target.time}`;
-        nextTaskCountdown.textContent = `atrasada ${formatDuration(Math.abs(diff))}`;
+        setCountdownState(`atrasada ${formatDuration(Math.abs(diff))}`, 'hot');
       } else {
         nextTaskMeta.textContent = `${group} · ${target.time}`;
-        nextTaskCountdown.textContent = `en ${formatDuration(diff)}`;
+        if (diffMin <= TIME_CHIP_RED_THRESHOLD_MIN) {
+          setCountdownState(`en ${formatDuration(diff)}`, 'hot');
+        } else if (diffMin <= TIME_CHIP_YELLOW_THRESHOLD_MIN) {
+          setCountdownState(`en ${formatDuration(diff)}`, 'warn');
+        } else {
+          setCountdownState(`en ${formatDuration(diff)}`, 'ok');
+        }
       }
     }
 
@@ -438,12 +460,12 @@
     }
 
     function buildTimelineRow(summary, options = {}) {
-      const { virtual = false, index = 0, animate = true } = options;
+      const { virtual = false, index = 0, animate = !virtual } = options;
       const row = document.createElement('div');
-      row.className = virtual ? 'absolute left-0 right-0 swipe-wrap' : 'relative swipe-wrap';
+      row.className = virtual ? 'absolute left-0 right-0 swipe-wrap task-shell' : 'relative swipe-wrap task-shell';
       if (virtual) {
         row.style.top = `${index * VIRTUAL_ROW_HEIGHT}px`;
-        row.style.height = `${VIRTUAL_ROW_HEIGHT}px`;
+        // row.style.height = `${VIRTUAL_ROW_HEIGHT}px`;
       }
       if (animate) {
         const delaySeed = virtual ? (index % 8) : index;
@@ -455,41 +477,68 @@
       const actions = document.createElement('div');
       actions.className = 'swipe-actions';
       actions.innerHTML = `
-        <button class="swipe-minus" data-action="undo" data-id="${summary.task.id}" ${summary.doneCount > 0 ? '' : 'disabled'}>
-          <span class="swipe-label">−</span>
+        <button class="swipe-plus" data-action="done" data-id="${summary.task.id}" ${summary.doneCount >= summary.total ? 'disabled' : ''} aria-label="Completar" title="Completar">
+          <span class="swipe-icon">+</span>
         </button>
-        <button class="swipe-edit" data-action="edit" data-id="${summary.task.id}">
-          <span class="swipe-label">Editar</span>
+        <button class="swipe-minus" data-action="undo" data-id="${summary.task.id}" ${summary.doneCount > 0 ? '' : 'disabled'} aria-label="Deshacer" title="Deshacer">
+          <span class="swipe-icon">−</span>
         </button>
-        <button class="swipe-delete" data-action="delete" data-id="${summary.task.id}">
-          <span class="swipe-label">Eliminar</span>
+        <button class="swipe-edit" data-action="edit" data-id="${summary.task.id}" aria-label="Editar" title="Editar">
+          <span class="swipe-icon">✎</span>
+        </button>
+        <button class="swipe-delete" data-action="delete" data-id="${summary.task.id}" aria-label="Eliminar" title="Eliminar">
+          <span class="swipe-icon">🗑</span>
         </button>
       `;
       row.appendChild(actions);
 
       const card = document.createElement('article');
       const taskColor = resolveTaskColor(summary.task);
-      const taskGroup = resolveTaskGroup(summary.task);
-      const fullyDone = summary.total > 0 && summary.doneCount >= summary.total;
       const progressPct = summary.total ? Math.round((summary.doneCount / summary.total) * 100) : 0;
+      const progressLevelClass = progressPct >= 100
+        ? 'task-count-chip--done'
+        : progressPct >= 67
+          ? 'task-count-chip--high'
+          : progressPct >= 34
+            ? 'task-count-chip--mid'
+            : 'task-count-chip--low';
       const timeTag = summary.displayTime || '--:--';
-      const sizeClass = virtual ? 'h-full' : 'min-h-[86px]';
-      card.className = `glass-strong card-bg task-progress ${animate ? 'animate-progress' : ''} rounded-none px-4 py-3 border border-white/10 flex items-center gap-3 hover:border-white/30 transition card-inner ${sizeClass}`;
-      card.style.borderLeft = `6px solid ${taskColor}`;
+      let timeChipClass = 'task-time-chip--yellow';
+      if (summary.doneCount >= summary.total) {
+        timeChipClass = 'task-time-chip--green';
+      } else if (summary.displayTime) {
+        const now = new Date();
+        const diffMin = (timeToDate(summary.displayTime, now).getTime() - now.getTime()) / 60000;
+        if (diffMin <= TIME_CHIP_RED_THRESHOLD_MIN) {
+          timeChipClass = 'task-time-chip--red';
+        } else if (diffMin <= TIME_CHIP_YELLOW_THRESHOLD_MIN) {
+          timeChipClass = 'task-time-chip--yellow';
+        } else {
+          timeChipClass = 'task-time-chip--green';
+        }
+      }
+      const sizeClass = virtual ? 'h-full' : 'min-h-[88px]';
+      card.className = `card-bg task-progress ${animate ? 'animate-progress' : ''} px-3.5 py-2.5 flex items-center gap-3 transition card-inner ${sizeClass}`;
+      card.style.borderLeft = `4px solid ${taskColor}`;
       card.style.setProperty('--task-progress', `${progressPct}%`);
       if (animate) {
         const delaySeed = virtual ? (index % 8) : index;
         card.style.setProperty('--progress-delay', `${Math.min(delaySeed * 22 + 40, 220)}ms`);
       }
       card.innerHTML = `
-        <button class="check-btn ${fullyDone ? 'checked' : ''}" data-action="done" data-id="${summary.task.id}">${fullyDone ? '✔' : ''}</button>
-        <div class="avatar w-10 h-10 rounded-xl flex items-center justify-center text-xl" style="background:${taskColor}22; color:${taskColor}">${summary.task.emoji || '•'}</div>
-        <div class="flex-1 card-main">
+        <div class="flex-1 card-main min-w-0">
           <div class="flex items-center gap-2 min-w-0">
-            <p class="font-semibold text-base card-title truncate flex-1">${summary.task.title}</p>
-            <span class="pill shrink-0 px-2 py-1 text-[11px] uppercase tracking-[0.12em] text-slate-200">${timeTag}</span>
+            <span class="task-emoji-badge shrink-0" style="background:${taskColor}1f; border-color:${taskColor}55; color:${taskColor}">
+              <span class="task-emoji">${summary.task.emoji || '•'}</span>
+            </span>
+            <div class="task-main-copy min-w-0 flex-1">
+              <p class="task-title card-title">${summary.task.title}</p>
+              <div class="task-meta-row">
+                <span class="task-count-chip ${progressLevelClass}" title="Ocurrencias de hoy">${summary.total}</span>
+                <span class="task-time-chip ${timeChipClass}">${timeTag}</span>
+              </div>
+            </div>
           </div>
-          <p class="card-sub text-xs">${taskGroup}</p>
         </div>
       `;
       row.appendChild(card);
@@ -519,10 +568,9 @@
         });
 
         const container = document.createElement('section');
-        container.className = 'mb-3';
 
         const header = document.createElement('div');
-        header.className = 'flex items-center justify-between border border-white/10 border-b-0 px-3 py-2 bg-white/5';
+        header.className = 'flex items-center justify-between border border-white/10 px-3 py-2 rounded-xl bg-white/5';
         header.innerHTML = `
           <div class="flex items-center gap-2 min-w-0">
             <span class="w-2.5 h-2.5 shrink-0" style="background:${section.meta.color}"></span>
@@ -533,7 +581,7 @@
         container.appendChild(header);
 
         const listEl = document.createElement('div');
-        listEl.className = 'space-y-0';
+        listEl.className = 'mt-2 space-y-2';
         section.items.forEach((summary, idx) => {
           listEl.appendChild(buildTimelineRow(summary, { index: idx, animate: true }));
         });
@@ -756,7 +804,7 @@
     form.addEventListener('submit', (e) => {
       e.preventDefault();
       const data = Object.fromEntries(new FormData(form));
-      const type = data.type;
+      const type = ALLOWED_FREQUENCIES.includes(data.type) ? data.type : 'daily';
       const selectedGroup = groups.find(group => group.id === data.groupId);
       const base = {
         id: editingTaskId || crypto.randomUUID(),
@@ -773,14 +821,10 @@
         task = { ...base, time: data.time || '09:00' };
       } else if (type === 'every-x-hours') {
         task = { ...base, startTime: data.startTime || '07:00', interval: Number(data.interval) || 3 };
-      } else if (type === 'weekdays') {
-        const days = [...form.querySelectorAll('input[name="days"]:checked')].map(i => Number(i.value));
-        task = { ...base, days, weekdayTime: data.weekdayTime || '09:00' };
-      } else if (type === 'specific-dates') {
-        const dates = (data.dates || '').split(',').map(d => d.trim()).filter(Boolean);
-        task = { ...base, dates, specificTime: data.specificTime || '10:00' };
       } else if (type === 'multi-times') {
         task = { ...base, times: [...multiTimesBuffer] };
+      } else {
+        task = { ...base, time: data.time || '09:00', type: 'daily' };
       }
 
       const existingIndex = tasks.findIndex(t => t.id === editingTaskId);
@@ -900,22 +944,16 @@
       renderGroupOptions(matchedGroup ? matchedGroup.id : '');
       form.elements['title'].value = task.title || '';
       form.elements['emoji'].value = task.emoji || '';
-      form.elements['type'].value = task.type;
-      updateBlocks(task.type);
+      const safeType = ALLOWED_FREQUENCIES.includes(task.type) ? task.type : 'daily';
+      form.elements['type'].value = safeType;
+      updateBlocks(safeType);
 
-      if (task.type === 'daily') {
+      if (safeType === 'daily') {
         form.elements['time'].value = task.time || '09:00';
-      } else if (task.type === 'every-x-hours') {
+      } else if (safeType === 'every-x-hours') {
         form.elements['startTime'].value = task.startTime || '07:00';
         form.elements['interval'].value = task.interval || 3;
-      } else if (task.type === 'weekdays') {
-        form.elements['weekdayTime'].value = task.weekdayTime || '09:00';
-        const checks = form.querySelectorAll('input[name=\"days\"]');
-        checks.forEach(c => c.checked = task.days?.includes(Number(c.value)) || false);
-      } else if (task.type === 'specific-dates') {
-        form.elements['dates'].value = (task.dates || []).join(',');
-        form.elements['specificTime'].value = task.specificTime || '10:00';
-      } else if (task.type === 'multi-times') {
+      } else if (safeType === 'multi-times') {
         multiTimesBuffer = [...(task.times || ['08:00'])];
         renderTimesChips();
       }

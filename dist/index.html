@@ -16,7 +16,7 @@
 
   <div class="floating-bg"></div>
 
-  <div class="relative max-w-5xl mx-auto px-4 pb-12 pt-10 sm:pt-14">
+  <div class="relative max-w-5xl mx-auto px-4 pt-10 sm:pt-14">
     <header class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
       <div>
         <p class="uppercase text-xs tracking-[0.3em] text-slate-400">Ritmo diario</p>
@@ -35,38 +35,21 @@
       </div>
     </header>
 
-    <section id="nextTaskCard" class="glass-card rounded-2xl p-4 mb-4 sticky top-3 z-30">
-      <div class="flex items-center justify-between gap-3">
-        <div class="flex items-center gap-3 min-w-0">
-          <div id="nextTaskEmoji" class="w-10 h-10 rounded-xl bg-accent/10 text-accent flex items-center justify-center text-xl">⏭</div>
-          <div class="min-w-0">
-            <p class="text-[11px] uppercase tracking-[0.18em] text-slate-400">Siguiente tarea</p>
-            <p id="nextTaskTitle" class="font-semibold text-base card-title truncate">Sin tareas para hoy</p>
-            <p id="nextTaskMeta" class="text-xs card-sub truncate">Crea una tarea y aparece aqui.</p>
+    <section id="nextTaskCard" class="next-task-card glass-card rounded-2xl p-3.5 mb-4 z-30 md:sticky md:top-3">
+      <div class="flex items-center gap-3 min-w-0">
+        <div id="nextTaskEmoji" class="next-task-emoji-badge">⏭</div>
+        <div class="min-w-0 flex-1">
+          <p class="next-task-kicker">Siguiente tarea</p>
+          <p id="nextTaskTitle" class="font-semibold text-[1.05rem] card-title truncate">Sin tareas para hoy</p>
+          <div class="next-task-meta-row">
+            <p id="nextTaskMeta" class="text-xs card-sub truncate flex-1">Crea una tarea y aparece aqui.</p>
+            <span id="nextTaskCountdown" class="next-task-countdown-chip">--</span>
           </div>
-        </div>
-        <div class="text-right shrink-0">
-          <p class="text-[11px] uppercase tracking-[0.18em] text-slate-400">Cuenta regresiva</p>
-          <p id="nextTaskCountdown" class="font-semibold text-base card-title">--</p>
         </div>
       </div>
     </section>
 
-    <section class="glass-card rounded-3xl p-5 sm:p-6 shadow-glass relative overflow-hidden">
-      <div class="absolute inset-0 pointer-events-none opacity-40" aria-hidden="true">
-        <div class="absolute -left-32 top-10 w-72 h-72 bg-gradient-to-br from-accent/10 to-white/5 rounded-full blur-3xl"></div>
-        <div class="absolute right-0 -bottom-24 w-80 h-80 bg-gradient-to-tr from-highlight/10 to-white/5 rounded-full blur-3xl"></div>
-      </div>
-      <div class="relative flex items-center justify-between mb-4">
-        <div class="flex items-center gap-3">
-          <div class="w-10 h-10 rounded-2xl bg-accent/10 text-accent flex items-center justify-center text-xl">⏱️</div>
-          <div>
-            <h2 class="font-display text-xl font-semibold">Línea del tiempo</h2>
-          </div>
-        </div>
-        <div></div>
-      </div>
-
+    <section class="relative overflow-hidden mb-10">
       <div class="relative mb-4">
         <div class="flex items-center justify-between text-sm text-slate-300 mb-2">
           <span id="progressLabel">Progreso 0%</span>
@@ -81,15 +64,15 @@
         <div class="flex items-center justify-between gap-2">
           <p class="text-xs uppercase tracking-[0.2em] text-slate-400">Vista por grupos</p>
           <div id="viewModeSwitch" class="view-toggle">
-            <button type="button" class="view-toggle-btn active" data-view-mode="time">Por hora</button>
-            <button type="button" class="view-toggle-btn" data-view-mode="group">Por grupo</button>
+            <button type="button" class="view-toggle-btn active" data-view-mode="time">Hora</button>
+            <button type="button" class="view-toggle-btn" data-view-mode="group">Grupo</button>
           </div>
         </div>
         <div id="groupFilters" class="flex gap-2 overflow-x-auto pb-1 sm:flex-wrap sm:overflow-visible"></div>
       </div>
 
       <div class="relative overflow-x-hidden" id="timelineWrapper">
-        <div id="timeline" class="relative min-w-full pt-2 pb-2"></div>
+        <div id="timeline" class="relative min-w-full"></div>
       </div>
 
       <div class="mt-6 flex justify-center">
@@ -129,8 +112,6 @@
           <select name="type" class="mt-1 w-full glass-card rounded-xl px-3 py-2 text-sm">
             <option value="daily">Diaria</option>
             <option value="every-x-hours">Cada X horas</option>
-            <option value="weekdays">Días específicos</option>
-            <option value="specific-dates">Fechas específicas</option>
             <option value="multi-times">Varias veces al día</option>
           </select>
         </label>
@@ -149,29 +130,6 @@
                 <input name="interval" type="number" min="1" value="3" class="mt-1 w-full glass-card rounded-xl px-3 py-2 text-sm" />
               </label>
             </div>
-          </div>
-          <div data-type="weekdays" class="freq-block hidden">
-            <p class="text-sm text-slate-200 mb-1">Días</p>
-            <div class="grid grid-cols-3 gap-2 text-xs text-slate-200">
-              <label class="pill px-3 py-2 flex items-center gap-2"><input type="checkbox" name="days" value="1" checked /> Lun</label>
-              <label class="pill px-3 py-2 flex items-center gap-2"><input type="checkbox" name="days" value="2" /> Mar</label>
-              <label class="pill px-3 py-2 flex items-center gap-2"><input type="checkbox" name="days" value="3" /> Mié</label>
-              <label class="pill px-3 py-2 flex items-center gap-2"><input type="checkbox" name="days" value="4" /> Jue</label>
-              <label class="pill px-3 py-2 flex items-center gap-2"><input type="checkbox" name="days" value="5" /> Vie</label>
-              <label class="pill px-3 py-2 flex items-center gap-2"><input type="checkbox" name="days" value="6" /> Sáb</label>
-              <label class="pill px-3 py-2 flex items-center gap-2"><input type="checkbox" name="days" value="0" /> Dom</label>
-            </div>
-            <label class="text-sm text-slate-200 block mt-2">Hora
-              <input name="weekdayTime" type="time" value="09:00" class="mt-1 w-full glass-card rounded-xl px-3 py-2 text-sm" />
-            </label>
-          </div>
-          <div data-type="specific-dates" class="freq-block hidden">
-            <label class="text-sm text-slate-200 block">Fechas
-              <input name="dates" type="text" placeholder="2026-03-10,2026-03-15" class="mt-1 w-full glass-card rounded-xl px-3 py-2 text-sm" />
-            </label>
-            <label class="text-sm text-slate-200 block">Hora
-              <input name="specificTime" type="time" value="10:00" class="mt-1 w-full glass-card rounded-xl px-3 py-2 text-sm" />
-            </label>
           </div>
           <div data-type="multi-times" class="freq-block hidden">
             <p class="text-sm text-slate-200">Horas del día</p>
@@ -203,4 +161,3 @@
   <script src="assets/js/index.js"></script>
 </body>
 </html>
-
